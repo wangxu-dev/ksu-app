@@ -1,18 +1,30 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/page-header'
+import { HomeSearch } from '@/components/home-search'
 import { getSavedToken } from '@/lib/auth'
 import { getGradesCached } from '@/lib/auth/service'
 import type { GradesData } from '@/lib/grades'
 import { useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 function formatDateTime(ts: number) {
   return new Date(ts).toLocaleString('zh-CN', { hour12: false })
 }
 
 export function GradesPage() {
+  return (
+    <>
+      <PageHeader>
+        <HomeSearch />
+      </PageHeader>
+      <GradesContent />
+    </>
+  )
+}
+
+function GradesContent() {
   const navigate = useNavigate()
   const [token] = useState(() => getSavedToken())
   const [data, setData] = useState<GradesData | null>(null)
@@ -57,47 +69,29 @@ export function GradesPage() {
   }, [data])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-muted/30 to-background dark:from-primary/10 dark:via-muted/20">
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate({ to: '/home' })}>
-              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-              返回
-            </Button>
-            <div className="ml-1 text-sm font-semibold">成绩</div>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => load(true)}
-              disabled={isLoading}
-            >
-              <RefreshCw aria-hidden="true" className="h-4 w-4" />
-              刷新
-            </Button>
-          </div>
+    <div>
+      <div id="summary" className="flex flex-wrap items-end justify-between gap-4 scroll-mt-20">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">成绩概览</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {fetchedAt ? `上次更新：${formatDateTime(fetchedAt)}` : ' '}
+          </p>
         </div>
-      </header>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => load(true)}
+          disabled={isLoading}
+        >
+          <RefreshCw aria-hidden="true" className="h-4 w-4" />
+          刷新
+        </Button>
+      </div>
 
-      <main className="mx-auto w-full max-w-5xl px-6 py-8">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">成绩概览</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {fetchedAt ? `上次更新：${formatDateTime(fetchedAt)}` : ' '}
-            </p>
-          </div>
-        </div>
+      {error ? <p className="mt-4 text-sm text-muted-foreground">获取失败：{error}</p> : null}
 
-        {error ? (
-          <p className="mt-4 text-sm text-muted-foreground">获取失败：{error}</p>
-        ) : null}
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">GPA</CardTitle>
@@ -132,34 +126,33 @@ export function GradesPage() {
           </Card>
         </div>
 
-        <div className="mt-6 space-y-4">
-          {data?.semesterGradeList?.map((sem) => (
-            <Card key={sem.semester}>
-              <CardHeader>
-                <CardTitle className="text-base">{sem.semester}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {sem.gradeList.map((g) => (
-                  <div
-                    key={g.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{g.courseName}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        学分 {g.credit.toFixed(1)} · 绩点 {g.gp.toFixed(1)}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-lg font-semibold tabular-nums">{g.scoreText}</div>
+      <div id="semesters" className="mt-6 space-y-4 scroll-mt-20">
+        {data?.semesterGradeList?.map((sem) => (
+          <Card key={sem.semester}>
+            <CardHeader>
+              <CardTitle className="text-base">{sem.semester}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {sem.gradeList.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{g.courseName}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      学分 {g.credit.toFixed(1)} · 绩点 {g.gp.toFixed(1)}
                     </div>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </main>
+                  <div className="shrink-0 text-right">
+                    <div className="text-lg font-semibold tabular-nums">{g.scoreText}</div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }

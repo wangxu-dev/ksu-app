@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { PageHeader } from '@/components/page-header'
+import { HomeSearch } from '@/components/home-search'
 import { getSavedToken } from '@/lib/auth'
 import { getCalendarMonthCached } from '@/lib/auth/service'
 import { formatYearMonth, getCachedCalendarMonth, weekText, type CalendarDay } from '@/lib/calendar'
 import { useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 function addMonths(date: Date, delta: number) {
@@ -22,6 +23,17 @@ function ymd(date: Date) {
 }
 
 export function CalendarPage() {
+  return (
+    <>
+      <PageHeader>
+        <HomeSearch />
+      </PageHeader>
+      <CalendarContent />
+    </>
+  )
+}
+
+function CalendarContent() {
   const navigate = useNavigate()
   const [token] = useState(() => getSavedToken())
   const [cursor, setCursor] = useState(() => new Date())
@@ -95,98 +107,79 @@ export function CalendarPage() {
   const today = useMemo(() => ymd(new Date()), [])
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-primary/5 via-muted/30 to-background dark:from-primary/10 dark:via-muted/20">
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate({ to: '/home' })}>
-              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-              返回
-            </Button>
-            <div className="ml-1 text-sm font-semibold">校历</div>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => load(true)} disabled={isLoading}>
-              <RefreshCw aria-hidden="true" className="h-4 w-4" />
-              刷新
-            </Button>
-          </div>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{yearMonth}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {fetchedAt ? `上次更新：${new Date(fetchedAt).toLocaleString('zh-CN', { hour12: false })}` : ' '}
+          </p>
         </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl px-6 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{yearMonth}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {fetchedAt ? `上次更新：${new Date(fetchedAt).toLocaleString('zh-CN', { hour12: false })}` : ' '}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setCursor((d) => addMonths(d, -1))} className="gap-2">
-              <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-              上月
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>
-              本月
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCursor((d) => addMonths(d, 1))} className="gap-2">
-              下月
-              <ChevronRight aria-hidden="true" className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCursor((d) => addMonths(d, -1))} className="gap-2">
+            <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+            上月
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>
+            本月
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCursor((d) => addMonths(d, 1))} className="gap-2">
+            下月
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => load(true)} disabled={isLoading}>
+            <RefreshCw aria-hidden="true" className="h-4 w-4" />
+            刷新
+          </Button>
         </div>
+      </div>
 
-        {error ? <p className="mt-4 text-sm text-muted-foreground">获取失败：{error}</p> : null}
+      {error ? <p className="mt-4 text-sm text-muted-foreground">获取失败：{error}</p> : null}
 
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="text-base">月视图</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
-              {['一', '二', '三', '四', '五', '六', '日'].map((w) => (
-                <div key={w} className="px-1 py-1 text-center">
-                  周{w}
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 grid grid-cols-7 gap-2">
-              {grid.map((cell) => {
-                const dateStr = ymd(cell.date)
-                const day = dayByDate.get(dateStr)
-                const isToday = dateStr === today
-                const label = day?.rc ?? (day ? weekText(day.zc) : null)
-                const showLabel = Boolean(day?.rc)
-                return (
-                  <div
-                    key={dateStr}
-                    className={[
-                      'min-h-20 rounded-lg border bg-background p-2',
-                      cell.inMonth ? '' : 'opacity-50',
-                      isToday ? 'border-primary ring-1 ring-primary/30' : '',
-                      showLabel ? 'bg-primary/5 dark:bg-primary/10 border-primary/20' : '',
-                    ].join(' ')}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold tabular-nums">{cell.date.getDate()}</div>
-                      {day?.zc ? (
-                        <div className="text-[10px] text-muted-foreground">{weekText(day.zc)}</div>
-                      ) : null}
-                    </div>
-                    {label ? (
-                      <div className={['mt-2 text-xs', day?.rc ? 'font-medium text-foreground' : 'text-muted-foreground'].join(' ')}>
-                        {label}
-                      </div>
-                    ) : null}
+      <Card id="month" className="mt-4 scroll-mt-20">
+        <CardHeader>
+          <CardTitle className="text-base">月视图</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
+            {['一', '二', '三', '四', '五', '六', '日'].map((w) => (
+              <div key={w} className="px-1 py-1 text-center">
+                周{w}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-7 gap-2">
+            {grid.map((cell) => {
+              const dateStr = ymd(cell.date)
+              const day = dayByDate.get(dateStr)
+              const isToday = dateStr === today
+              const label = day?.rc ?? (day ? weekText(day.zc) : null)
+              const showLabel = Boolean(day?.rc)
+              return (
+                <div
+                  key={dateStr}
+                  className={[
+                    'min-h-20 rounded-lg border bg-background p-2',
+                    cell.inMonth ? '' : 'opacity-50',
+                    isToday ? 'border-primary ring-1 ring-primary/30' : '',
+                    showLabel ? 'bg-primary/5 dark:bg-primary/10 border-primary/20' : '',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold tabular-nums">{cell.date.getDate()}</div>
+                    {day?.zc ? <div className="text-[10px] text-muted-foreground">{weekText(day.zc)}</div> : null}
                   </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+                  {label ? (
+                    <div className={['mt-2 text-xs', day?.rc ? 'font-medium text-foreground' : 'text-muted-foreground'].join(' ')}>
+                      {label}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
