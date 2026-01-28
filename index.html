@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/ksu.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ksu-App</title>
+    <script>
+      (function () {
+        try {
+          var mode = localStorage.getItem('ksu:theme') || 'system'
+          var isDark =
+            mode === 'dark' ||
+            (mode === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          if (isDark) root.classList.add('dark')
+          else root.classList.remove('dark')
+          root.style.colorScheme = isDark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
   </head>
 
   <body>

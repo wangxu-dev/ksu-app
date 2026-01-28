@@ -6,6 +6,7 @@ import type { GradesData } from '@/lib/grades'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 function formatDateTime(ts: number) {
   return new Date(ts).toLocaleString('zh-CN', { hour12: false })
@@ -56,7 +57,7 @@ export function GradesPage() {
   }, [data])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-muted/30 to-background dark:from-primary/10 dark:via-muted/20">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
@@ -66,16 +67,19 @@ export function GradesPage() {
             </Button>
             <div className="ml-1 text-sm font-semibold">成绩</div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => load(true)}
-            disabled={isLoading}
-          >
-            <RefreshCw aria-hidden="true" className="h-4 w-4" />
-            刷新
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => load(true)}
+              disabled={isLoading}
+            >
+              <RefreshCw aria-hidden="true" className="h-4 w-4" />
+              刷新
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -159,4 +163,3 @@ export function GradesPage() {
     </div>
   )
 }
-

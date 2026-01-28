@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import "./index.css";
+import { initTheme } from "@/lib/theme";
 
 import { routeTree } from "./routeTree.gen";
 
@@ -12,6 +13,8 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+initTheme();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

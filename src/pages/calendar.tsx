@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { getSavedToken } from '@/lib/auth'
 import { getCalendarMonthCached } from '@/lib/auth/service'
 import { formatYearMonth, getCachedCalendarMonth, weekText, type CalendarDay } from '@/lib/calendar'
@@ -94,7 +95,7 @@ export function CalendarPage() {
   const today = useMemo(() => ymd(new Date()), [])
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-muted/40 to-background">
+    <div className="min-h-screen bg-linear-to-b from-primary/5 via-muted/30 to-background dark:from-primary/10 dark:via-muted/20">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
@@ -104,10 +105,13 @@ export function CalendarPage() {
             </Button>
             <div className="ml-1 text-sm font-semibold">校历</div>
           </div>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => load(true)} disabled={isLoading}>
-            <RefreshCw aria-hidden="true" className="h-4 w-4" />
-            刷新
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => load(true)} disabled={isLoading}>
+              <RefreshCw aria-hidden="true" className="h-4 w-4" />
+              刷新
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -162,7 +166,7 @@ export function CalendarPage() {
                       'min-h-20 rounded-lg border bg-background p-2',
                       cell.inMonth ? '' : 'opacity-50',
                       isToday ? 'border-primary ring-1 ring-primary/30' : '',
-                      showLabel ? 'bg-muted/40' : '',
+                      showLabel ? 'bg-primary/5 dark:bg-primary/10 border-primary/20' : '',
                     ].join(' ')}
                   >
                     <div className="flex items-center justify-between gap-2">
