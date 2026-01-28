@@ -1,28 +1,62 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface LoginCredentials {
   username: string;
   password: string;
-  rememberMe: boolean;
+  remember: boolean;
+}
+
+interface LoginResponse {
+  success: boolean;
+  token?: string;
+  message: string;
+}
+
+interface UserInfoData {
+  username: string;
+  user_name: string;
+  user_uid: string;
+  user_id: string;
+  organization_name?: string;
+  identity_type_name?: string;
+}
+
+interface UserInfoResponse {
+  success: boolean;
+  data?: UserInfoData;
+  message: string;
 }
 
 export function useLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const login = async (credentials: LoginCredentials): Promise<void> => {
+  const login = useCallback(async ({ username, password, remember }: LoginCredentials): Promise<{ token?: string }> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // TODO: 调用 Tauri command 进行真实登录
-      // const result = await invoke('login', { ...credentials });
+      const result = await invoke<LoginResponse>("login", {
+        username,
+        password,
+        remember,
+      });
 
-      // 模拟登录请求
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Login attempt:", credentials);
+      if (result.success && result.token) {
+        // 获取用户信息
+        const userInfo = await invoke<UserInfoResponse>("get_user_info", {
+          token: result.token,
+        });
 
-      // 这里后续会处理真实登录逻辑
+        if (userInfo.success) {
+          return { token: result.token };
+        } else {
+          throw new Error(userInfo.message || "获取用户信息失败");
+        }
+      } else {
+        throw new Error(result.message || "登录失败");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败，请重试";
       setError(message);
@@ -30,11 +64,35 @@ export function useLogin() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  const autoLogin = useCallback(async (): Promise<{ success: boolean; token?: string }> => {
+    try {
+      const token = await invoke<string | null>("get_saved_token");
+      if (!token) {
+        return { success: false };
+      }
+
+      // 验证 token 是否有效
+      const userInfo = await invoke<UserInfoResponse>("get_user_info", {
+        token,
+      });
+
+      if (userInfo.success) {
+        return { success: true, token };
+      } else {
+        return { success: false };
+      }
+    } catch (e) {
+      console.error("自动登录失败:", e);
+      return { success: false };
+    }
+  }, []);
 
   return {
     login,
     isLoading,
     error,
+    autoLogin,
   };
 }
