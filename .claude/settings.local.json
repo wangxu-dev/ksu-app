@@ -5,6 +5,10 @@
       "mcp__web-search__search",
       "mcp__context7__query-docs",
       "Bash(npm run typecheck)"
+    ],
+    "reject": [
+      "Bash(npm run tauri dev)",
+      "Bash(npm run dev)"
     ]
   }
 }
