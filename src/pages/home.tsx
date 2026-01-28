@@ -2,7 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut, User } from "lucide-react";
+import {
+  BookOpen,
+  FlaskConical,
+  LibraryBig,
+  LogOut,
+  User,
+  Wallet,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchDashboard, logout } from "@/lib/auth/service";
 
@@ -12,11 +19,16 @@ export function Home() {
   const [personal, setPersonal] = useState<PersonalInfoData | null>(null);
   const [personalError, setPersonalError] = useState<string | null>(null);
   const [token] = useState(() => getSavedToken());
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     let canceled = false;
-    if (!token) return;
+    if (!token) {
+      navigate({ to: "/login" });
+      return;
+    }
 
+    setIsLoading(true);
     fetchDashboard(token)
       .then((data) => {
         if (canceled) return;
@@ -27,107 +39,150 @@ export function Home() {
         if (canceled) return;
         setPersonal(null);
         setPersonalError(e instanceof Error ? e.message : "获取个人信息失败");
+      })
+      .finally(() => {
+        if (canceled) return;
+        setIsLoading(false);
       });
 
     return () => {
       canceled = true;
     };
-  }, [token]);
+  }, [token, navigate]);
 
   const handleLogout = () => {
     logout();
     navigate({ to: "/login" });
   };
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b p-4">
-        <div className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          <span>主页</span>
+  const formatCurrency = (v?: string) => {
+    if (!v) return "--";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return v;
+    return n.toFixed(2);
+  };
+
+  const Stat = ({
+    title,
+    value,
+    unit,
+    icon,
+  }: {
+    title: string;
+    value: string;
+    unit?: string;
+    icon: React.ReactNode;
+  }) => (
+    <Card className="relative overflow-hidden">
+      <CardHeader className="space-y-0">
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+          <div aria-hidden="true" className="text-muted-foreground">
+            {icon}
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleLogout}
-          className="gap-2"
-        >
-          <LogOut className="h-4 w-4" />
-          退出登录
-        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-baseline gap-2">
+          <div className="text-2xl font-semibold tabular-nums">{value}</div>
+          {unit ? <div className="text-sm text-muted-foreground">{unit}</div> : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-muted/40 to-background">
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-lg border bg-background">
+              <User aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="leading-tight">
+              <div className="text-sm font-semibold tracking-tight">校园助手</div>
+              <div className="text-xs text-muted-foreground">Kashgar University</div>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+            <LogOut aria-hidden="true" className="h-4 w-4" />
+            退出
+          </Button>
+        </div>
       </header>
 
-      <main className="flex-1 p-6">
-        <div className="mx-auto w-full max-w-4xl space-y-6">
-          <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">
-            {user?.user_name ? `欢迎回来，${user.user_name}` : "欢迎回来"}
-          </h1>
-          <p className="text-muted-foreground">
-            {user
-              ? `学号：${user.username}`
-              : "登录成功，这里将展示您的校园信息"}
-          </p>
-          {user?.organization_name && (
-            <p className="text-muted-foreground">班级：{user.organization_name}</p>
-          )}
-          {user?.identity_type_name && (
-            <p className="text-muted-foreground">身份：{user.identity_type_name}</p>
-          )}
+      <main className="mx-auto w-full max-w-5xl px-6 py-8">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-base">个人信息</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-xl font-semibold">
+                {user?.user_name ? `你好，${user.user_name}` : "你好"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {user?.username ? `学号：${user.username}` : "学号：--"}
+              </div>
+              {user?.organization_name ? (
+                <div className="text-sm text-muted-foreground">班级：{user.organization_name}</div>
+              ) : null}
+              {user?.identity_type_name ? (
+                <div className="text-sm text-muted-foreground">身份：{user.identity_type_name}</div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <div className="lg:col-span-2">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">概览</h1>
+                <p className="mt-1 text-sm text-muted-foreground">你的校园数据一览</p>
+              </div>
+              <div className="hidden sm:flex gap-2">
+                <Button variant="outline" size="sm" disabled>
+                  课表
+                </Button>
+                <Button variant="outline" size="sm" disabled>
+                  成绩
+                </Button>
+                <Button variant="outline" size="sm" disabled>
+                  图书馆
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Stat
+                title="校园卡余额"
+                value={isLoading ? "--" : formatCurrency(personal?.xykye)}
+                unit="元"
+                icon={<Wallet className="h-5 w-5" />}
+              />
+              <Stat
+                title="课程数"
+                value={isLoading ? "--" : (personal?.kcs ?? "--")}
+                unit="门"
+                icon={<BookOpen className="h-5 w-5" />}
+              />
+              <Stat
+                title="科研成果"
+                value={isLoading ? "--" : (personal?.kycg ?? "--")}
+                unit="项"
+                icon={<FlaskConical className="h-5 w-5" />}
+              />
+              <Stat
+                title="图书馆借阅"
+                value={isLoading ? "--" : (personal ? `${personal.tszj}/${personal.tsyj}` : "--")}
+                unit="在借/已借"
+                icon={<LibraryBig className="h-5 w-5" />}
+              />
+            </div>
+
+            {personalError ? (
+              <p className="mt-3 text-sm text-muted-foreground">个人信息获取失败：{personalError}</p>
+            ) : null}
           </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>校园卡余额</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {personal?.xykye ?? "--"}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>课程数</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {personal?.kcs ?? "--"}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>科研成果</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {personal?.kycg ?? "--"}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>图书馆在借</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {personal?.tszj ?? "--"}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>图书馆已借阅</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {personal?.tsyj ?? "--"}
-              </CardContent>
-            </Card>
-          </div>
-
-          {personalError && (
-            <p className="text-sm text-muted-foreground">
-              个人信息面板获取失败：{personalError}
-            </p>
-          )}
         </div>
       </main>
     </div>
