@@ -1,16 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { clearAuth, getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
+import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
 import { useNavigate } from "@tanstack/react-router";
-import { invoke } from "@tauri-apps/api/core";
 import { LogOut, User } from "lucide-react";
 import { useEffect, useState } from "react";
-
-interface PersonalInfoResponse {
-  success: boolean;
-  data?: PersonalInfoData;
-  message: string;
-}
+import { fetchDashboard, logout } from "@/lib/auth/service";
 
 export function Home() {
   const navigate = useNavigate();
@@ -23,16 +17,11 @@ export function Home() {
     let canceled = false;
     if (!token) return;
 
-    invoke<PersonalInfoResponse>("get_personal_info", { token })
-      .then((res) => {
+    fetchDashboard(token)
+      .then((data) => {
         if (canceled) return;
-        if (res.success && res.data) {
-          setPersonal(res.data);
-          setPersonalError(null);
-        } else {
-          setPersonal(null);
-          setPersonalError(res.message || "获取个人信息失败");
-        }
+        setPersonal(data);
+        setPersonalError(null);
       })
       .catch((e) => {
         if (canceled) return;
@@ -46,7 +35,7 @@ export function Home() {
   }, [token]);
 
   const handleLogout = () => {
-    clearAuth();
+    logout();
     navigate({ to: "/login" });
   };
 

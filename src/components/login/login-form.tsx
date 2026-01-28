@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,8 +11,12 @@ export function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, isLoading, error } = useLogin();
+  const { login, isLoading, error, rememberedAccount } = useLogin();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (rememberedAccount) setUsername(rememberedAccount);
+  }, [rememberedAccount]);
 
   const handleSubmit = async () => {
     if (!username || !password) return;
@@ -83,7 +87,7 @@ export function LoginForm() {
             disabled={isLoading}
           />
           <Label htmlFor="remember" className="text-sm cursor-pointer">
-            记住登录
+            记住账号
           </Label>
         </div>
 

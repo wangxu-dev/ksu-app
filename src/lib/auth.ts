@@ -18,10 +18,23 @@ export interface PersonalInfoData {
 
 const TOKEN_KEY = 'ksu:token'
 const USER_KEY = 'ksu:user'
+const ACCOUNT_KEY = 'ksu:account'
 
 export function saveAuth(token: string, user: UserInfoData) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function saveRememberedAccount(username: string) {
+  localStorage.setItem(ACCOUNT_KEY, username)
+}
+
+export function getRememberedAccount(): string | null {
+  return localStorage.getItem(ACCOUNT_KEY)
+}
+
+export function clearRememberedAccount() {
+  localStorage.removeItem(ACCOUNT_KEY)
 }
 
 export function getSavedToken(): string | null {
