@@ -6,7 +6,8 @@ import {
   saveRememberedAccount,
   type UserInfoData,
 } from '@/lib/auth'
-import { getPersonalInfo, getUserInfo } from '@/lib/api/ksu'
+import { getGrades, getPersonalInfo, getUserInfo } from '@/lib/api/ksu'
+import { getCachedGrades, setCachedGrades, type CachedGrades, type GradesData } from '@/lib/grades'
 
 type LoginResponse = {
   success: boolean
@@ -48,7 +49,23 @@ export async function fetchDashboard(token: string) {
   return getPersonalInfo(token)
 }
 
+export async function getGradesCached(
+  token: string,
+  opts?: { maxAgeMs?: number; force?: boolean }
+): Promise<{ data: GradesData; cached: boolean; fetchedAt: number }> {
+  const maxAgeMs = opts?.maxAgeMs ?? 24 * 60 * 60 * 1000
+  const cached: CachedGrades | null = getCachedGrades()
+  const isFresh = cached ? Date.now() - cached.fetchedAt <= maxAgeMs : false
+
+  if (cached && isFresh && !opts?.force) {
+    return { data: cached.data, cached: true, fetchedAt: cached.fetchedAt }
+  }
+
+  const data = await getGrades(token)
+  setCachedGrades(data)
+  return { data, cached: false, fetchedAt: Date.now() }
+}
+
 export function logout() {
   clearAuth()
 }
-

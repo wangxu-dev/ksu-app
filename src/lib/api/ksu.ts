@@ -1,9 +1,11 @@
 import { fetchJson, ApiError } from '@/lib/api/client'
 import type { PersonalInfoData, UserInfoData } from '@/lib/auth'
+import type { GradesData, GradesRaw } from '@/lib/grades'
 
 const USER_INFO_URL = 'https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user'
 const PERSONAL_INFO_URL =
   'https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo'
+const GRADES_URL = 'https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1'
 
 type UserInfoRaw = {
   code: number
@@ -73,3 +75,16 @@ export async function getPersonalInfo(token: string): Promise<PersonalInfoData> 
   return raw.data
 }
 
+export async function getGrades(token: string): Promise<GradesData> {
+  const raw = await fetchJson<GradesRaw>(GRADES_URL, {
+    method: 'GET',
+    headers: baseHeaders(token),
+    timeoutMs: 25_000,
+  })
+
+  if (!raw.success || raw.code !== 200 || !raw.data) {
+    throw new ApiError(raw.msg || '获取成绩失败', { code: raw.code, payload: raw })
+  }
+
+  return raw.data
+}

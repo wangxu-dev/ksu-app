@@ -5,13 +5,15 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpen,
   FlaskConical,
+  GraduationCap,
   LibraryBig,
   LogOut,
   User,
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fetchDashboard, logout } from "@/lib/auth/service";
+import { fetchDashboard, getGradesCached, logout } from "@/lib/auth/service";
+import { getCachedGrades } from "@/lib/grades";
 
 export function Home() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export function Home() {
   const [personalError, setPersonalError] = useState<string | null>(null);
   const [token] = useState(() => getSavedToken());
   const [isLoading, setIsLoading] = useState(false);
+  const [gpa, setGpa] = useState<string | null>(() => getCachedGrades()?.data?.gpa ?? null);
 
   useEffect(() => {
     let canceled = false;
@@ -49,6 +52,24 @@ export function Home() {
       canceled = true;
     };
   }, [token, navigate]);
+
+  useEffect(() => {
+    let canceled = false;
+    if (!token) return;
+
+    getGradesCached(token, { maxAgeMs: 7 * 24 * 60 * 60 * 1000 })
+      .then((res) => {
+        if (canceled) return;
+        setGpa(res.data.gpa);
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [token]);
 
   const handleLogout = () => {
     logout();
@@ -140,10 +161,7 @@ export function Home() {
                 <p className="mt-1 text-sm text-muted-foreground">你的校园数据一览</p>
               </div>
               <div className="hidden sm:flex gap-2">
-                <Button variant="outline" size="sm" disabled>
-                  课表
-                </Button>
-                <Button variant="outline" size="sm" disabled>
+                <Button variant="outline" size="sm" onClick={() => navigate({ to: "/grades" })}>
                   成绩
                 </Button>
                 <Button variant="outline" size="sm" disabled>
@@ -158,6 +176,11 @@ export function Home() {
                 value={isLoading ? "--" : formatCurrency(personal?.xykye)}
                 unit="元"
                 icon={<Wallet className="h-5 w-5" />}
+              />
+              <Stat
+                title="GPA"
+                value={gpa ?? "--"}
+                icon={<GraduationCap className="h-5 w-5" />}
               />
               <Stat
                 title="课程数"
