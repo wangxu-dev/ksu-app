@@ -3,8 +3,8 @@ import { LoginForm } from "@/components/login/login-form";
 
 const CAMPUS_IMAGES = [
   "/CampusAndSnowPeak.png",
-  "/CampusClockTower.png",
-  "/CampusComplex.png",
+  // "/CampusClockTower.png",
+  // "/CampusComplex.png",
   "/CampusLakePark.png",
   "/CampusPanorama.png",
 ] as const;

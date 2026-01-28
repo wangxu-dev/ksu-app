@@ -24,22 +24,19 @@ export function LoginForm() {
   const isValid = username.length > 0 && password.length > 0;
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm space-y-5">
       {/* Logo */}
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center">
         <img src="/ksu.svg" alt="KSU" className="h-14 w-14" />
       </div>
 
-      {/* 表单容器 */}
-      <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6 shadow-lg space-y-5">
-        {/* 标题 */}
-        <div className="text-center space-y-1">
-          <h1 className="text-2xl font-semibold">Ksu-App</h1>
-          <p className="text-sm text-muted-foreground">喀什大学校园统一入口</p>
-        </div>
+      {/* 标题 */}
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground">喀什大学认证统一入口</p>
+      </div>
 
-        {/* 表单字段 */}
-        <div className="space-y-4">
+      {/* 表单字段 */}
+      <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username" className="text-sm">学号</Label>
             <div className="relative">
@@ -89,7 +86,6 @@ export function LoginForm() {
             {isLoading ? "登录中..." : "登录"}
           </Button>
         </div>
-      </div>
     </div>
   );
 }
