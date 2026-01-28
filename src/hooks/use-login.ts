@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { saveAuth } from "@/lib/auth";
 
 interface LoginCredentials {
   username: string;
@@ -49,7 +50,8 @@ export function useLogin() {
           token: result.token,
         });
 
-        if (userInfo.success) {
+        if (userInfo.success && userInfo.data) {
+          saveAuth(result.token, userInfo.data);
           return { token: result.token };
         } else {
           throw new Error(userInfo.message || "获取用户信息失败");
@@ -78,7 +80,8 @@ export function useLogin() {
         token,
       });
 
-      if (userInfo.success) {
+      if (userInfo.success && userInfo.data) {
+        saveAuth(token, userInfo.data);
         return { success: true, token };
       } else {
         return { success: false };

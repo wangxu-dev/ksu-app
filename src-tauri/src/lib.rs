@@ -47,10 +47,44 @@ pub struct UserInfoData {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UserInfoAttributes {
+    pub organization_id: Option<String>,
+    pub identity_type_code: Option<String>,
+    pub account_id: Option<String>,
+    pub organization_name: Option<String>,
+    pub organization_code: Option<String>,
+    pub image_url: Option<String>,
+    pub identity_type_name: Option<String>,
+    pub identity_type_id: Option<String>,
+    pub user_name: Option<String>,
+    pub user_id: Option<String>,
+    pub user_uid: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UserInfoEnvelope {
+    pub username: String,
+    pub roles: Option<Vec<String>>,
+    pub attributes: Option<UserInfoAttributes>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum UserInfoDataAny {
+    // Older / alternate payloads (flat fields).
+    Flat(UserInfoData),
+    // Current payload nested under `attributes`.
+    Envelope(UserInfoEnvelope),
+}
+
+#[derive(Debug, Deserialize)]
 struct UserInfoRaw {
+    #[serde(default)]
+    pub acknowleged: Option<bool>,
     pub code: i32,
     pub message: Option<String>,
-    pub data: Option<UserInfoData>,
+    pub data: Option<UserInfoDataAny>,
 }
 
 #[tauri::command]
@@ -96,9 +130,36 @@ async fn get_user_info(token: String) -> Result<UserInfoResponse, String> {
         let text = response.text().await.map_err(|e| e.to_string())?;
         if let Ok(data) = serde_json::from_str::<UserInfoRaw>(&text) {
             if data.code == 0 {
+                let user_data = match data.data {
+                    Some(UserInfoDataAny::Flat(d)) => Some(d),
+                    Some(UserInfoDataAny::Envelope(env)) => {
+                        let attrs = env.attributes.unwrap_or(UserInfoAttributes {
+                            organization_id: None,
+                            identity_type_code: None,
+                            account_id: None,
+                            organization_name: None,
+                            organization_code: None,
+                            image_url: None,
+                            identity_type_name: None,
+                            identity_type_id: None,
+                            user_name: None,
+                            user_id: None,
+                            user_uid: None,
+                        });
+                        Some(UserInfoData {
+                            username: env.username,
+                            user_name: attrs.user_name.unwrap_or_default(),
+                            user_uid: attrs.user_uid.unwrap_or_default(),
+                            user_id: attrs.user_id.unwrap_or_default(),
+                            organization_name: attrs.organization_name,
+                            identity_type_name: attrs.identity_type_name,
+                        })
+                    }
+                    None => None,
+                };
                 Ok(UserInfoResponse {
                     success: true,
-                    data: data.data,
+                    data: user_data,
                     message: "获取成功".to_string(),
                 })
             } else {
@@ -109,10 +170,19 @@ async fn get_user_info(token: String) -> Result<UserInfoResponse, String> {
                 })
             }
         } else {
+            let mut debug_path = std::env::temp_dir();
+            debug_path.push(format!(
+                "ksu_user_info_response_{}.txt",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            ));
+            let _ = std::fs::write(&debug_path, &text);
             Ok(UserInfoResponse {
                 success: false,
                 data: None,
-                message: "解析响应失败".to_string(),
+                message: format!("解析响应失败，已保存响应到：{}", debug_path.display()),
             })
         }
     } else {
