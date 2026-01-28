@@ -11,6 +11,8 @@ use tauri_plugin_store::StoreBuilder;
 
 const LOGIN_URL: &str = "https://cas.ksu.edu.cn/cas/login?service=https%3A%2F%2Fportal.ksu.edu.cn%2F%3Fpath%3Dhttps%253A%252F%252Fportal.ksu.edu.cn%252Fmain.html%2523%252F";
 const USER_INFO_URL: &str = "https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user";
+const PERSONAL_INFO_URL: &str =
+    "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo";
 const STORE_KEY: &str = "auth";
 
 lazy_static::lazy_static! {
@@ -46,6 +48,7 @@ pub struct UserInfoData {
     pub identity_type_name: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UserInfoAttributes {
@@ -62,6 +65,7 @@ struct UserInfoAttributes {
     pub user_uid: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct UserInfoEnvelope {
     pub username: String,
@@ -78,6 +82,7 @@ enum UserInfoDataAny {
     Envelope(UserInfoEnvelope),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct UserInfoRaw {
     #[serde(default)]
@@ -85,6 +90,30 @@ struct UserInfoRaw {
     pub code: i32,
     pub message: Option<String>,
     pub data: Option<UserInfoDataAny>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersonalInfoResponse {
+    pub success: bool,
+    pub data: Option<PersonalInfoData>,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PersonalInfoData {
+    pub xgh: String,
+    pub kycg: String,
+    pub kcs: String,
+    pub tszj: String,
+    pub tsyj: String,
+    pub xykye: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PersonalInfoRaw {
+    pub code: i32,
+    pub message: Option<String>,
+    pub data: Option<PersonalInfoData>,
 }
 
 #[tauri::command]
@@ -187,6 +216,58 @@ async fn get_user_info(token: String) -> Result<UserInfoResponse, String> {
         }
     } else {
         Ok(UserInfoResponse {
+            success: false,
+            data: None,
+            message: format!("请求失败: {}", response.status()),
+        })
+    }
+}
+
+#[tauri::command]
+async fn get_personal_info(token: String) -> Result<PersonalInfoResponse, String> {
+    let client = create_client();
+    let response = client
+        .get(PERSONAL_INFO_URL)
+        .header("x-id-token", &token)
+        .header("x-device-info", "PC")
+        .header("x-terminal-info", "PC")
+        .header("Referer", "https://portal.ksu.edu.cn/main.html")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if response.status().is_success() {
+        let text = response.text().await.map_err(|e| e.to_string())?;
+        match serde_json::from_str::<PersonalInfoRaw>(&text) {
+            Ok(raw) if raw.code == 0 => Ok(PersonalInfoResponse {
+                success: true,
+                data: raw.data,
+                message: "获取成功".to_string(),
+            }),
+            Ok(raw) => Ok(PersonalInfoResponse {
+                success: false,
+                data: None,
+                message: raw.message.unwrap_or_else(|| "未知错误".to_string()),
+            }),
+            Err(_) => {
+                let mut debug_path = std::env::temp_dir();
+                debug_path.push(format!(
+                    "ksu_personal_info_response_{}.txt",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                ));
+                let _ = std::fs::write(&debug_path, &text);
+                Ok(PersonalInfoResponse {
+                    success: false,
+                    data: None,
+                    message: format!("解析响应失败，已保存响应到：{}", debug_path.display()),
+                })
+            }
+        }
+    } else {
+        Ok(PersonalInfoResponse {
             success: false,
             data: None,
             message: format!("请求失败: {}", response.status()),
@@ -429,6 +510,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             login,
             get_user_info,
+            get_personal_info,
             get_saved_token
         ])
         .run(tauri::generate_context!())

@@ -1,12 +1,49 @@
 import { Button } from "@/components/ui/button";
-import { clearAuth, getSavedUser } from "@/lib/auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { clearAuth, getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
 import { useNavigate } from "@tanstack/react-router";
+import { invoke } from "@tauri-apps/api/core";
 import { LogOut, User } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
+
+interface PersonalInfoResponse {
+  success: boolean;
+  data?: PersonalInfoData;
+  message: string;
+}
 
 export function Home() {
   const navigate = useNavigate();
-  const user = useMemo(() => getSavedUser(), []);
+  const [user] = useState(() => getSavedUser());
+  const [personal, setPersonal] = useState<PersonalInfoData | null>(null);
+  const [personalError, setPersonalError] = useState<string | null>(null);
+  const [token] = useState(() => getSavedToken());
+
+  useEffect(() => {
+    let canceled = false;
+    if (!token) return;
+
+    invoke<PersonalInfoResponse>("get_personal_info", { token })
+      .then((res) => {
+        if (canceled) return;
+        if (res.success && res.data) {
+          setPersonal(res.data);
+          setPersonalError(null);
+        } else {
+          setPersonal(null);
+          setPersonalError(res.message || "获取个人信息失败");
+        }
+      })
+      .catch((e) => {
+        if (canceled) return;
+        setPersonal(null);
+        setPersonalError(e instanceof Error ? e.message : "获取个人信息失败");
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [token]);
 
   const handleLogout = () => {
     clearAuth();
@@ -31,8 +68,9 @@ export function Home() {
         </Button>
       </header>
 
-      <main className="flex-1 flex items-center justify-center">
-        <div className="text-center space-y-4">
+      <main className="flex-1 p-6">
+        <div className="mx-auto w-full max-w-4xl space-y-6">
+          <div className="space-y-2">
           <h1 className="text-2xl font-semibold">
             {user?.user_name ? `欢迎回来，${user.user_name}` : "欢迎回来"}
           </h1>
@@ -46,6 +84,60 @@ export function Home() {
           )}
           {user?.identity_type_name && (
             <p className="text-muted-foreground">身份：{user.identity_type_name}</p>
+          )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>校园卡余额</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">
+                {personal?.xykye ?? "--"}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>课程数</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">
+                {personal?.kcs ?? "--"}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>科研成果</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">
+                {personal?.kycg ?? "--"}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>图书馆在借</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">
+                {personal?.tszj ?? "--"}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>图书馆已借阅</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-semibold">
+                {personal?.tsyj ?? "--"}
+              </CardContent>
+            </Card>
+          </div>
+
+          {personalError && (
+            <p className="text-sm text-muted-foreground">
+              个人信息面板获取失败：{personalError}
+            </p>
           )}
         </div>
       </main>
