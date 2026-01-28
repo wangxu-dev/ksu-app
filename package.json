@@ -4,12 +4,13 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsr && vite",
-    "build": "tsr && tsc && vite build",
+    "dev": "tsr generate && vite",
+    "build": "tsr generate && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsr && tsc -noEmit",
-    "tsr": "tsr"
+    "typecheck": "tsr generate && tsc -noEmit",
+    "tsr": "tsr generate",
+    "tsr:watch": "tsr watch"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

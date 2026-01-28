@@ -6,8 +6,14 @@ import {
   saveRememberedAccount,
   type UserInfoData,
 } from '@/lib/auth'
-import { getGrades, getPersonalInfo, getUserInfo } from '@/lib/api/ksu'
+import { getCalendarMonth, getGrades, getPersonalInfo, getUserInfo } from '@/lib/api/ksu'
 import { getCachedGrades, setCachedGrades, type CachedGrades, type GradesData } from '@/lib/grades'
+import {
+  formatYearMonth,
+  getCachedCalendarMonth,
+  setCachedCalendarMonth,
+  type CalendarDay,
+} from '@/lib/calendar'
 
 type LoginResponse = {
   success: boolean
@@ -64,6 +70,28 @@ export async function getGradesCached(
   const data = await getGrades(token)
   setCachedGrades(data)
   return { data, cached: false, fetchedAt: Date.now() }
+}
+
+export async function getCalendarMonthCached(
+  token: string,
+  yearMonth: string,
+  opts?: { maxAgeMs?: number; force?: boolean }
+): Promise<{ data: CalendarDay[]; cached: boolean; fetchedAt: number }> {
+  const maxAgeMs = opts?.maxAgeMs ?? 30 * 24 * 60 * 60 * 1000
+  const cached = getCachedCalendarMonth(yearMonth)
+  const isFresh = cached ? Date.now() - cached.fetchedAt <= maxAgeMs : false
+
+  if (cached && isFresh && !opts?.force) {
+    return { data: cached.data, cached: true, fetchedAt: cached.fetchedAt }
+  }
+
+  const data = await getCalendarMonth(token, yearMonth)
+  setCachedCalendarMonth(yearMonth, data)
+  return { data, cached: false, fetchedAt: Date.now() }
+}
+
+export function currentYearMonth() {
+  return formatYearMonth(new Date())
 }
 
 export function logout() {

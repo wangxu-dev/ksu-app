@@ -4,6 +4,7 @@ import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
 import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpen,
+  CalendarDays,
   FlaskConical,
   GraduationCap,
   LibraryBig,
@@ -12,8 +13,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fetchDashboard, getGradesCached, logout } from "@/lib/auth/service";
+import { fetchDashboard, getCalendarMonthCached, getGradesCached, logout } from "@/lib/auth/service";
 import { getCachedGrades } from "@/lib/grades";
+import { formatYearMonth, weekText } from "@/lib/calendar";
 
 export function Home() {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export function Home() {
   const [token] = useState(() => getSavedToken());
   const [isLoading, setIsLoading] = useState(false);
   const [gpa, setGpa] = useState<string | null>(() => getCachedGrades()?.data?.gpa ?? null);
+  const [week, setWeek] = useState<string | null>(null);
 
   useEffect(() => {
     let canceled = false;
@@ -61,6 +64,27 @@ export function Home() {
       .then((res) => {
         if (canceled) return;
         setGpa(res.data.gpa);
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    let canceled = false;
+    if (!token) return;
+    const ym = formatYearMonth(new Date());
+    const today = new Date().toISOString().slice(0, 10);
+
+    getCalendarMonthCached(token, ym, { maxAgeMs: 30 * 24 * 60 * 60 * 1000 })
+      .then((res) => {
+        if (canceled) return;
+        const day = res.data.find((d) => d.rq === today);
+        setWeek(day ? weekText(day.zc) : null);
       })
       .catch(() => {
         // ignore
@@ -164,6 +188,9 @@ export function Home() {
                 <Button variant="outline" size="sm" onClick={() => navigate({ to: "/grades" })}>
                   成绩
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate({ to: "/calendar" })}>
+                  校历
+                </Button>
                 <Button variant="outline" size="sm" disabled>
                   图书馆
                 </Button>
@@ -181,6 +208,11 @@ export function Home() {
                 title="GPA"
                 value={gpa ?? "--"}
                 icon={<GraduationCap className="h-5 w-5" />}
+              />
+              <Stat
+                title="教学周"
+                value={week ?? "--"}
+                icon={<CalendarDays className="h-5 w-5" />}
               />
               <Stat
                 title="课程数"

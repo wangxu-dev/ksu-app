@@ -11,8 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as GradesRouteImport } from './routes/grades'
+import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as IndexRouteImport } from './routes/index'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -24,49 +25,58 @@ const HomeRoute = HomeRouteImport.update({
   path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GradesRoute = GradesRouteImport.update({
   id: '/grades',
   path: '/grades',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/grades': typeof GradesRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
-  '/grades': typeof GradesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/grades': typeof GradesRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
-  '/grades': typeof GradesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
+  '/grades': typeof GradesRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
-  '/grades': typeof GradesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/home' | '/login' | '/grades'
+  fullPaths: '/' | '/calendar' | '/grades' | '/home' | '/login'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/home' | '/login' | '/grades'
-  id: '__root__' | '/' | '/home' | '/login' | '/grades'
+  to: '/' | '/calendar' | '/grades' | '/home' | '/login'
+  id: '__root__' | '/' | '/calendar' | '/grades' | '/home' | '/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalendarRoute: typeof CalendarRoute
+  GradesRoute: typeof GradesRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
-  GradesRoute: typeof GradesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -85,13 +95,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/grades': {
       id: '/grades'
       path: '/grades'
@@ -99,14 +102,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GradesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalendarRoute: CalendarRoute,
+  GradesRoute: GradesRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
-  GradesRoute: GradesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

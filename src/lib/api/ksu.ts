@@ -1,11 +1,13 @@
 import { fetchJson, ApiError } from '@/lib/api/client'
 import type { PersonalInfoData, UserInfoData } from '@/lib/auth'
 import type { GradesData, GradesRaw } from '@/lib/grades'
+import type { CalendarDay, CalendarResponse } from '@/lib/calendar'
 
 const USER_INFO_URL = 'https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user'
 const PERSONAL_INFO_URL =
   'https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo'
 const GRADES_URL = 'https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1'
+const CALENDAR_URL = 'https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getXlInfo'
 
 type UserInfoRaw = {
   code: number
@@ -87,4 +89,24 @@ export async function getGrades(token: string): Promise<GradesData> {
   }
 
   return raw.data
+}
+
+export async function getCalendarMonth(token: string, yearMonth: string): Promise<CalendarDay[]> {
+  const url = new URL(CALENDAR_URL)
+  url.searchParams.set('ny', yearMonth)
+  url.searchParams.set('random_number', String(Date.now()))
+
+  const raw = await fetchJson<CalendarResponse>(url, {
+    method: 'GET',
+    headers: {
+      'x-id-token': token,
+    },
+    timeoutMs: 25_000,
+  })
+
+  if (raw.code !== 0) {
+    throw new ApiError(raw.message || '获取校历失败', { code: raw.code, payload: raw })
+  }
+
+  return raw.data ?? []
 }
