@@ -1,0 +1,3 @@
+[submodule "src-tauri/go-tool"]
+	path = src-tauri/go-tool
+	url = https://github.com/lDuang/curl-tls.git
