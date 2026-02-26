@@ -1,4 +1,5 @@
 import { ipcInvoke } from "@/lib/ipc";
+import { AUTH_LOGIN_CHANNEL } from "@/lib/request/channels";
 import {
   clearAuth,
   clearRememberedAccount,
@@ -26,7 +27,7 @@ export async function loginWithBackend(opts: {
   password: string;
   rememberAccount: boolean;
 }): Promise<{ token: string; user: UserInfoData }> {
-  const result = await ipcInvoke<LoginResponse>("auth:login", {
+  const result = await ipcInvoke<LoginResponse>(AUTH_LOGIN_CHANNEL, {
     username: opts.username,
     password: opts.password,
   });
