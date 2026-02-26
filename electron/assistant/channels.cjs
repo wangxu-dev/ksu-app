@@ -8,6 +8,8 @@ const ASSISTANT_CONVERSATION_MESSAGES_CHANNEL = "assistant:conversation:messages
 const ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL = "assistant:conversation:replace-messages";
 const ASSISTANT_SETTINGS_GET_CHANNEL = "assistant:settings:get";
 const ASSISTANT_SETTINGS_SET_CHANNEL = "assistant:settings:set";
+const ASSISTANT_MCP_LIST_TOOLS_CHANNEL = "assistant:mcp:list-tools";
+const ASSISTANT_MCP_CALL_TOOL_CHANNEL = "assistant:mcp:call-tool";
 
 module.exports = {
   ASSISTANT_STREAM_START_CHANNEL,
@@ -20,4 +22,6 @@ module.exports = {
   ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
+  ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
+  ASSISTANT_MCP_CALL_TOOL_CHANNEL,
 };

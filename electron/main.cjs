@@ -5,6 +5,7 @@ const { buildKsuRequest } = require("./ksu/request-builder.cjs");
 const { dispatchRequest } = require("./request/dispatcher.cjs");
 const { runAssistantStream } = require("./assistant/runtime.cjs");
 const { createAssistantStore } = require("./assistant/store.cjs");
+const { createKsuMcpRegistry } = require("./assistant/mcp/ksu-mcp.cjs");
 const {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
@@ -18,6 +19,8 @@ const {
   ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
+  ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
+  ASSISTANT_MCP_CALL_TOOL_CHANNEL,
 } = require("./assistant/channels.cjs");
 
 function platformWindowOptions() {
@@ -184,6 +187,18 @@ app.whenReady().then(() => {
   ipcMain.handle(ASSISTANT_SETTINGS_SET_CHANNEL, async (_event, payload) =>
     assistantStore.setSettings(payload || {}),
   );
+  ipcMain.handle(ASSISTANT_MCP_LIST_TOOLS_CHANNEL, async (event) => {
+    const registry = createKsuMcpRegistry({
+      callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
+    });
+    return registry.listTools();
+  });
+  ipcMain.handle(ASSISTANT_MCP_CALL_TOOL_CHANNEL, async (event, payload) => {
+    const registry = createKsuMcpRegistry({
+      callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
+    });
+    return registry.callTool(String(payload?.name || ""), payload?.args || {});
+  });
   createWindow();
 });
 

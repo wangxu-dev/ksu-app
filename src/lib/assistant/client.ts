@@ -1,5 +1,7 @@
 import { ipcInvoke, ipcOn } from "@/lib/ipc";
 import {
+  ASSISTANT_MCP_CALL_TOOL_CHANNEL,
+  ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
@@ -80,6 +82,19 @@ export function setAssistantSettings(
   settings: Partial<AssistantSettings>,
 ): Promise<AssistantSettings> {
   return ipcInvoke<AssistantSettings>(ASSISTANT_SETTINGS_SET_CHANNEL, settings);
+}
+
+export type McpToolInfo = {
+  name: string;
+  description?: string;
+};
+
+export function listMcpTools(): Promise<McpToolInfo[]> {
+  return ipcInvoke<McpToolInfo[]>(ASSISTANT_MCP_LIST_TOOLS_CHANNEL);
+}
+
+export function callMcpTool<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
+  return ipcInvoke<T>(ASSISTANT_MCP_CALL_TOOL_CHANNEL, { name, args: args || {} });
 }
 
 export function onAssistantChunk(

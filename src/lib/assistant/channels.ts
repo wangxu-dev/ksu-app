@@ -9,3 +9,5 @@ export const ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL =
   "assistant:conversation:replace-messages";
 export const ASSISTANT_SETTINGS_GET_CHANNEL = "assistant:settings:get";
 export const ASSISTANT_SETTINGS_SET_CHANNEL = "assistant:settings:set";
+export const ASSISTANT_MCP_LIST_TOOLS_CHANNEL = "assistant:mcp:list-tools";
+export const ASSISTANT_MCP_CALL_TOOL_CHANNEL = "assistant:mcp:call-tool";
