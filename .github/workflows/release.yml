@@ -87,12 +87,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
             const currentTag = context.ref.replace('refs/tags/', '');
+            const changelogPath = 'CHANGELOG.md';
 
             function extractFromChangelog(tagName) {
-              const changelogPath = 'CHANGELOG.md';
               if (!fs.existsSync(changelogPath)) return null;
               const content = fs.readFileSync(changelogPath, 'utf8');
               const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -108,44 +106,14 @@ jobs:
             }
 
             const changelogNotes = extractFromChangelog(currentTag);
-            if (changelogNotes) {
-              const body = [`## ${currentTag}`, '', changelogNotes, '', 'Artifacts: Windows / macOS / Linux'].join('\\n');
-              core.setOutput('body', body);
+            if (!changelogNotes) {
+              core.setFailed(
+                `Missing release notes in CHANGELOG.md for ${currentTag}. Please add a section like '## ${currentTag}' or '## ${currentTag.replace(/^v/, '')}'.`,
+              );
               return;
             }
 
-            const tagsResp = await github.rest.repos.listTags({ owner, repo, per_page: 100 });
-            const tags = tagsResp.data.map(t => t.name);
-            const currentIndex = tags.findIndex(t => t === currentTag);
-            const previousTag = currentIndex >= 0 && currentIndex + 1 < tags.length ? tags[currentIndex + 1] : null;
-
-            let commits = [];
-            if (previousTag) {
-              const compare = await github.rest.repos.compareCommitsWithBasehead({
-                owner,
-                repo,
-                basehead: `${previousTag}...${currentTag}`,
-              });
-              commits = compare.data.commits || [];
-            } else {
-              const list = await github.rest.repos.listCommits({ owner, repo, per_page: 20 });
-              commits = list.data || [];
-            }
-
-            const header = [
-              `## ${currentTag}`,
-              '',
-              previousTag ? `Changes since ${previousTag}:` : 'Initial tagged release notes:',
-              '',
-            ];
-
-            const lines = commits.slice(0, 200).map(c => {
-              const sha = c.sha.slice(0, 7);
-              const msg = (c.commit.message || '').split('\n')[0];
-              return `- ${msg} (${sha})`;
-            });
-
-            const body = [...header, ...(lines.length ? lines : ['- No commit messages found.']), '', 'Artifacts: Windows / macOS / Linux'].join('\n');
+            const body = [`## ${currentTag}`, '', changelogNotes, '', 'Artifacts: Windows / macOS / Linux'].join('\n');
             core.setOutput('body', body);
 
       - name: Create GitHub Release

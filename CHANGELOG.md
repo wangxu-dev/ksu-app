@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.2 - 2026-02-26
+
+### Added
+
+- In-app update status flow in Electron main process with IPC bridge.
+- Top-right update action UI: download progress, retry, and `重启更新` action.
+- Updater source definitions with primary GitHub and fallback EdgeOne proxy.
+- Release distribution documentation for installer and updater metadata files.
+
+### Changed
+
+- Release workflow now enforces changelog-driven notes and fails when version notes are missing.
+- Release artifacts now include updater metadata files (`.yml`, `.blockmap`) and installer assets.
+- Installer-oriented packaging strategy retained for Windows (`nsis`), macOS (`dmg`), and Linux (`AppImage`).
+
+### Notes
+
+- App-side auto update requires `electron-updater` dependency to be installed.
+
 ## 0.0.1 - 2026-02-26
 
 ### Added
