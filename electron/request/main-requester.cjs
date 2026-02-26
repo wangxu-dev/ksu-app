@@ -10,6 +10,7 @@ async function requestViaMain(electronSession, payload) {
       method: payload.method ?? "GET",
       headers: payload.headers,
       body: payload.body,
+      credentials: "omit",
       redirect: payload.followRedirects ? "follow" : "manual",
       signal: controller.signal,
     });

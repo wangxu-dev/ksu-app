@@ -7,10 +7,11 @@ const CALENDAR_URL = "https://portal-data.ksu.edu.cn/portalCenter/v2/personalDat
 function baseHeaders(token) {
   return {
     accept: "application/json, text/plain, */*",
+    "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
     "x-id-token": token,
     "x-device-info": "PC",
     "x-terminal-info": "PC",
-    Referer: "https://portal.ksu.edu.cn/main.html",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
   };
 }
 
@@ -32,10 +33,13 @@ function buildKsuRequest(payload) {
   }
 
   if (endpoint === "personalInfo") {
+    const url = new URL(PERSONAL_INFO_URL);
+    url.searchParams.set("random_number", String(Date.now()));
+
     return {
       mode: "main",
       method: "GET",
-      url: PERSONAL_INFO_URL,
+      url: url.toString(),
       headers: baseHeaders(token),
       timeoutMs: 20_000,
     };
