@@ -89,12 +89,47 @@ export type McpToolInfo = {
   description?: string;
 };
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function listMcpTools(): Promise<McpToolInfo[]> {
-  return ipcInvoke<McpToolInfo[]>(ASSISTANT_MCP_LIST_TOOLS_CHANNEL);
+  console.debug("[assistant:mcp] list tools start");
+  return withTimeout(ipcInvoke<McpToolInfo[]>(ASSISTANT_MCP_LIST_TOOLS_CHANNEL), 15_000, "mcp list")
+    .then((tools) => {
+      console.debug("[assistant:mcp] list tools success", { count: tools.length });
+      return tools;
+    })
+    .catch((error) => {
+      console.error("[assistant:mcp] list tools failed", error);
+      throw error;
+    });
 }
 
 export function callMcpTool<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
-  return ipcInvoke<T>(ASSISTANT_MCP_CALL_TOOL_CHANNEL, { name, args: args || {} });
+  const safeArgs = args || {};
+  console.debug("[assistant:mcp] call start", { name, keys: Object.keys(safeArgs) });
+  return withTimeout(
+    ipcInvoke<T>(ASSISTANT_MCP_CALL_TOOL_CHANNEL, { name, args: safeArgs }),
+    20_000,
+    `mcp ${name}`,
+  )
+    .then((output) => {
+      console.debug("[assistant:mcp] call success", { name });
+      return output;
+    })
+    .catch((error) => {
+      console.error("[assistant:mcp] call failed", { name, error });
+      throw error;
+    });
 }
 
 export function onAssistantChunk(

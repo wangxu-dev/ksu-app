@@ -1,5 +1,8 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { z } = require("zod");
+const { createLogger } = require("../../shared/logger.cjs");
+
+const logger = createLogger("assistant:mcp");
 
 function parseResponse(response, label) {
   if (!response.ok) throw new Error(response.error || `${label} failed`);
@@ -83,16 +86,32 @@ function createKsuMcpRegistry({ callKsuEndpoint }) {
 
   return {
     listTools() {
-      return Array.from(tools.values()).map((t) => ({
+      const result = Array.from(tools.values()).map((t) => ({
         name: t.name,
         description: t.description,
       }));
+      logger.debug("list tools", { count: result.length });
+      return result;
     },
     async callTool(name, args) {
       const tool = tools.get(name);
       if (!tool) throw new Error(`unknown tool: ${name}`);
+      logger.info("call tool", {
+        name,
+        hasToken: Boolean(args && typeof args.token === "string" && args.token.length > 0),
+      });
       const parsed = tool.schema.parse(args || {});
-      return tool.handler(parsed);
+      try {
+        const output = await tool.handler(parsed);
+        logger.debug("tool call success", { name });
+        return output;
+      } catch (error) {
+        logger.error("tool call failed", {
+          name,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     },
   };
 }

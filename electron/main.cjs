@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("node:path");
+const { createLogger } = require("./shared/logger.cjs");
 const { login } = require("./auth/login.cjs");
 const { buildKsuRequest } = require("./ksu/request-builder.cjs");
 const { dispatchRequest } = require("./request/dispatcher.cjs");
@@ -22,6 +23,8 @@ const {
   ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
   ASSISTANT_MCP_CALL_TOOL_CHANNEL,
 } = require("./assistant/channels.cjs");
+
+const logger = createLogger("main");
 
 function platformWindowOptions() {
   if (process.platform === "darwin") {
@@ -141,6 +144,7 @@ function bindInspectContextMenu(win) {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
+  logger.info("app ready");
   const assistantStore = createAssistantStore(app.getPath("userData"));
   ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) =>
     login(event.sender.session, payload),
@@ -149,6 +153,9 @@ app.whenReady().then(() => {
     try {
       return await dispatchRequest(ipcMain, event, buildKsuRequest(payload));
     } catch (error) {
+      logger.error("ksu request failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         ok: false,
         status: 0,
@@ -180,6 +187,10 @@ app.whenReady().then(() => {
   );
   ipcMain.handle(ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL, async (_event, payload) => {
     const conversationId = String(payload?.conversationId || "");
+    logger.debug("replace conversation messages", {
+      conversationId,
+      count: Array.isArray(payload?.messages) ? payload.messages.length : 0,
+    });
     assistantStore.replaceMessages(conversationId, payload?.messages || []);
     return { ok: true };
   });
@@ -191,13 +202,23 @@ app.whenReady().then(() => {
     const registry = createKsuMcpRegistry({
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
+    logger.debug("mcp list tools");
     return registry.listTools();
   });
   ipcMain.handle(ASSISTANT_MCP_CALL_TOOL_CHANNEL, async (event, payload) => {
     const registry = createKsuMcpRegistry({
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
-    return registry.callTool(String(payload?.name || ""), payload?.args || {});
+    const toolName = String(payload?.name || "");
+    try {
+      return await registry.callTool(toolName, payload?.args || {});
+    } catch (error) {
+      logger.error("mcp call failed", {
+        toolName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   });
   createWindow();
 });

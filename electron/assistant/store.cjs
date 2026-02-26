@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
+const { createLogger } = require("../shared/logger.cjs");
 
 const DEFAULT_SETTINGS = {
   baseUrl: "https://openrouter.ai/api/v1",
@@ -15,10 +16,12 @@ function now() {
 }
 
 function createAssistantStore(userDataDir) {
+  const logger = createLogger("assistant:store");
   const dir = path.join(userDataDir, "assistant");
   fs.mkdirSync(dir, { recursive: true });
   const dbPath = path.join(dir, "assistant.sqlite");
   const db = new DatabaseSync(dbPath);
+  logger.info("open sqlite store", { dbPath });
 
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -132,7 +135,9 @@ function createAssistantStore(userDataDir) {
   function replaceMessages(conversationId, messages) {
     const ts = now();
     const rows = Array.isArray(messages) ? messages : [];
-    const tx = db.transaction(() => {
+    logger.debug("replace messages begin", { conversationId, count: rows.length });
+    db.exec("BEGIN");
+    try {
       deleteMessagesStmt.run(conversationId);
       for (const item of rows) {
         if (!item || (item.role !== "user" && item.role !== "assistant")) continue;
@@ -140,8 +145,17 @@ function createAssistantStore(userDataDir) {
         addMessageStmt.run(randomUUID(), conversationId, item.role, text, now());
       }
       touchConversationStmt.run(ts, conversationId);
-    });
-    tx();
+      db.exec("COMMIT");
+      logger.debug("replace messages committed", { conversationId, count: rows.length });
+    } catch (error) {
+      db.exec("ROLLBACK");
+      logger.error("replace messages failed", {
+        conversationId,
+        count: rows.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   return {

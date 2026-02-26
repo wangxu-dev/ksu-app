@@ -123,12 +123,26 @@ function AssistantContent() {
   const { messages, sendMessage, setMessages, status } = useChat({
     id: activeConversationId || "assistant",
     transport: transport as any,
+    onError: (error) => {
+      console.error("[assistant] chat error", error);
+    },
     onFinish: async ({ messages }) => {
       if (!activeConversationId) return;
       await replaceConversationMessages(activeConversationId, toPersistedMessages(messages));
       await refreshConversations();
     },
   });
+
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    console.debug("[assistant] state", {
+      status,
+      messageCount: messages.length,
+      lastRole: last.role,
+      parts: last.parts.map((part) => part.type),
+    });
+  }, [messages, status]);
 
   useEffect(() => {
     Promise.all([refreshConversations(), getAssistantSettings()]).then(async ([items, cfg]) => {
@@ -183,7 +197,11 @@ function AssistantContent() {
     const text = prompt.trim();
     if (!canSend || !text) return;
     setPrompt("");
-    await sendMessage({ text });
+    try {
+      await sendMessage({ text });
+    } catch (error) {
+      console.error("[assistant] send message failed", error);
+    }
   }
 
   return (
@@ -229,12 +247,12 @@ function AssistantContent() {
                       ),
                     }}
                   >
-                    {content || "..."}
+                    {content || "处理中（等待工具/模型返回）..."}
                   </ReactMarkdown>
                 </div>
               ) : (
                 <div className="whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 text-sm">
-                  {content || "..."}
+                  {content || "处理中（等待工具/模型返回）..."}
                 </div>
               )}
             </div>
