@@ -16,6 +16,12 @@ async function executeRendererFetch(task: RendererRequestTask): Promise<Renderer
   const controller = new AbortController();
   const timeoutMs = task.timeoutMs ?? 30_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  console.debug("[renderer-requester] start", {
+    requestId: task.requestId,
+    method: task.method,
+    url: task.url,
+    timeoutMs,
+  });
 
   try {
     const response = await fetch(task.url, {
@@ -35,6 +41,12 @@ async function executeRendererFetch(task: RendererRequestTask): Promise<Renderer
       body: await response.text(),
     };
   } catch (error) {
+    console.error("[renderer-requester] failed", {
+      requestId: task.requestId,
+      method: task.method,
+      url: task.url,
+      error: error instanceof Error ? error.message : "renderer request failed",
+    });
     return {
       requestId: task.requestId,
       ok: false,
@@ -44,6 +56,11 @@ async function executeRendererFetch(task: RendererRequestTask): Promise<Renderer
       error: error instanceof Error ? error.message : "renderer request failed",
     };
   } finally {
+    console.debug("[renderer-requester] done", {
+      requestId: task.requestId,
+      method: task.method,
+      url: task.url,
+    });
     clearTimeout(timer);
   }
 }

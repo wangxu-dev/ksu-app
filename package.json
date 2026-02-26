@@ -9,6 +9,7 @@
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on tcp:1420 && electron .\"",
     "build": "tsr generate && tsc && vite build",
     "electron:build": "npm run build",
+    "icons:electron": "python scripts/generate_electron_icons.py",
     "preview": "vite preview",
     "typecheck": "tsr generate && tsc -noEmit",
     "lint": "oxlint src electron --deny-warnings",
@@ -19,6 +20,9 @@
     "tsr:watch": "tsr watch"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.34",
+    "@ai-sdk/react": "^3.0.103",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-context-menu": "^2.2.16",
@@ -36,6 +40,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-router": "^1.163.2",
+    "ai": "^6.0.101",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -45,9 +50,12 @@
     "react": "^19.2.4",
     "react-day-picker": "^9.13.2",
     "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

@@ -1,5 +1,8 @@
 const { requestViaMain } = require("./main-requester.cjs");
 const { requestViaRenderer } = require("./renderer-requester.cjs");
+const { createLogger } = require("../shared/logger.cjs");
+
+const logger = createLogger("request:dispatcher");
 
 function normalizePayload(payload) {
   if (!payload || typeof payload !== "object") {
@@ -27,6 +30,9 @@ async function dispatchRequest(ipcMain, event, payload) {
   try {
     request = normalizePayload(payload);
   } catch (error) {
+    logger.error("normalize payload failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       ok: false,
       status: 0,
@@ -36,6 +42,12 @@ async function dispatchRequest(ipcMain, event, payload) {
     };
   }
 
+  logger.debug("dispatch request", {
+    mode: request.mode,
+    method: request.method,
+    url: request.url,
+    timeoutMs: request.timeoutMs,
+  });
   if (request.mode === "main") {
     return requestViaMain(event.sender.session, request);
   }
