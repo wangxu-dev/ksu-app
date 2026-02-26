@@ -29,6 +29,12 @@ const EMPTY_SETTINGS: AssistantSettings = {
   systemPrompt: "",
 };
 
+type ToolActivity = {
+  name: string;
+  state: "running" | "success" | "error";
+  label: string;
+};
+
 export function AssistantPage() {
   return (
     <>
@@ -41,29 +47,23 @@ export function AssistantPage() {
 }
 
 function extractMessageText(message: UIMessage): string {
-  const textParts = message.parts
+  return message.parts
     .filter(isTextUIPart)
     .map((part) => part.text)
     .join("");
-  if (textParts.trim()) return textParts;
+}
 
-  const toolParts = message.parts.filter(isToolUIPart);
-  if (toolParts.length > 0) {
-    return toolParts
-      .map((part) => {
-        const toolName = getToolName(part);
-        if (part.state === "output-available") {
-          return `调用工具 ${toolName} 成功`;
-        }
-        if (part.state === "output-error") {
-          return `调用工具 ${toolName} 失败`;
-        }
-        return `调用工具 ${toolName}`;
-      })
-      .join("\n");
-  }
-
-  return "";
+function extractToolActivities(message: UIMessage): ToolActivity[] {
+  return message.parts.filter(isToolUIPart).map((part) => {
+    const name = getToolName(part);
+    if (part.state === "output-available") {
+      return { name, state: "success", label: `工具 ${name} 已完成` };
+    }
+    if (part.state === "output-error") {
+      return { name, state: "error", label: `工具 ${name} 调用失败` };
+    }
+    return { name, state: "running", label: `工具 ${name} 执行中` };
+  });
 }
 
 function toPersistedMessages(
@@ -205,7 +205,7 @@ function AssistantContent() {
   }
 
   return (
-    <div className="relative flex h-[calc(100vh-10rem)] flex-col overflow-hidden rounded-lg border">
+    <div className="relative mx-auto flex h-[calc(100vh-10rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-background">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <div className="truncate text-sm font-medium">AI 对话</div>
         <div className="flex items-center gap-1">
@@ -221,47 +221,92 @@ function AssistantContent() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
+      <div className="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4">
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">输入“我是谁”或“我的成绩如何”开始。</p>
         ) : null}
         {messages.map((m) => {
           const content = extractMessageText(m);
+          const toolActivities = extractToolActivities(m);
+          const isUser = m.role === "user";
+          const shouldShowWaiting =
+            !isUser &&
+            status === "streaming" &&
+            content.trim().length === 0 &&
+            toolActivities.length === 0;
+
           return (
-            <div key={m.id} className="space-y-1">
-              <div className="text-xs text-muted-foreground">{m.role === "user" ? "你" : "AI"}</div>
-              {m.role === "assistant" ? (
-                <div className="rounded-md bg-muted/60 px-3 py-2 text-sm">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      ul: ({ children }) => (
-                        <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
-                      ),
-                      code: ({ children }) => (
-                        <code className="rounded bg-background px-1 py-0.5">{children}</code>
-                      ),
-                    }}
-                  >
-                    {content || "处理中（等待工具/模型返回）..."}
-                  </ReactMarkdown>
+            <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+              <div className="max-w-[78%] space-y-2">
+                <div
+                  className={`text-xs ${
+                    isUser
+                      ? "text-right text-muted-foreground/80"
+                      : "text-left text-muted-foreground"
+                  }`}
+                >
+                  {isUser ? "你" : "AI"}
                 </div>
-              ) : (
-                <div className="whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 text-sm">
-                  {content || "处理中（等待工具/模型返回）..."}
-                </div>
-              )}
+
+                {isUser ? (
+                  <div className="rounded-2xl bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
+                    <div className="whitespace-pre-wrap break-words">
+                      {content || "处理中（等待发送）..."}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm leading-7 text-foreground">
+                    {content.trim().length > 0 ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => (
+                            <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
+                          ),
+                          code: ({ children }) => (
+                            <code className="rounded bg-muted px-1 py-0.5">{children}</code>
+                          ),
+                        }}
+                      >
+                        {content}
+                      </ReactMarkdown>
+                    ) : null}
+                    {shouldShowWaiting ? (
+                      <div className="text-sm text-muted-foreground">思考中...</div>
+                    ) : null}
+                  </div>
+                )}
+
+                {!isUser && toolActivities.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {toolActivities.map((activity, index) => (
+                      <div
+                        key={`${activity.name}-${index}`}
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          activity.state === "error"
+                            ? "bg-destructive/10 text-destructive"
+                            : activity.state === "success"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {activity.label}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="border-t px-3 py-2">
-        <div className="flex items-end gap-2">
+      <div className="border-t px-4 py-3">
+        <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -275,9 +320,14 @@ function AssistantContent() {
               token ? "输入问题，回车发送，Shift+Enter 换行" : "未检测到登录 token，请先登录"
             }
             rows={2}
-            className="resize-none"
+            className="resize-none rounded-xl"
           />
-          <Button size="icon" disabled={!canSend} onClick={onSend}>
+          <Button
+            size="icon"
+            className="h-10 w-10 rounded-full"
+            disabled={!canSend}
+            onClick={onSend}
+          >
             <SendHorizontal />
           </Button>
         </div>
