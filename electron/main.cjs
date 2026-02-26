@@ -8,6 +8,13 @@ const { dispatchRequest } = require("./request/dispatcher.cjs");
 const { runAssistantStream } = require("./assistant/runtime.cjs");
 const { createAssistantStore } = require("./assistant/store.cjs");
 const { createKsuMcpRegistry } = require("./assistant/mcp/ksu-mcp.cjs");
+const { createUpdateManager } = require("./updater/manager.cjs");
+const {
+  APP_UPDATE_STATUS_CHANNEL,
+  APP_UPDATE_GET_STATUS_CHANNEL,
+  APP_UPDATE_CHECK_CHANNEL,
+  APP_UPDATE_INSTALL_CHANNEL,
+} = require("./updater/channels.cjs");
 const {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
@@ -166,6 +173,18 @@ function bindInspectContextMenu(win) {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
   logger.info("app ready");
+  const broadcastUpdateStatus = (payload) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(APP_UPDATE_STATUS_CHANNEL, payload);
+      }
+    }
+  };
+  const updateManager = createUpdateManager({
+    app,
+    logger,
+    publish: broadcastUpdateStatus,
+  });
   if (process.platform === "darwin" && app.dock) {
     const dockIcon = path.join(__dirname, "..", "build", "icons", "icon.png");
     if (fs.existsSync(dockIcon)) {
@@ -197,6 +216,11 @@ app.whenReady().then(() => {
   ipcMain.handle(PROXY_REQUEST_CHANNEL, async (event, payload) =>
     dispatchRequest(ipcMain, event, payload),
   );
+  ipcMain.handle(APP_UPDATE_GET_STATUS_CHANNEL, async () => updateManager.getStatus());
+  ipcMain.handle(APP_UPDATE_CHECK_CHANNEL, async () => updateManager.checkForUpdates());
+  ipcMain.handle(APP_UPDATE_INSTALL_CHANNEL, async () => ({
+    ok: updateManager.installDownloaded(),
+  }));
   ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload) =>
     runAssistantStream({
       event,
@@ -251,6 +275,7 @@ app.whenReady().then(() => {
     }
   });
   createWindow();
+  updateManager.startSilentCheck();
 });
 
 app.on("window-all-closed", () => {

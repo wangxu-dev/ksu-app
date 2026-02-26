@@ -9,6 +9,13 @@ This project uses GitHub Releases as the default update source, with an EdgeOne 
 
 Update source constants are defined in `electron/updater/sources.cjs`.
 
+## Client Runtime Dependency
+
+The app-side update client uses `electron-updater`.
+
+- Install command: `npm install electron-updater`
+- If this dependency is not installed, app update actions are disabled safely and the app continues to run normally.
+
 ## Release Artifacts
 
 The release workflow publishes:

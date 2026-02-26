@@ -2,6 +2,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AppTopNav } from "@/components/app-top-nav";
 import { usePageHeader } from "@/components/page-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { UpdateAction } from "@/components/update-action";
 import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <AppTopNav />
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <UpdateAction />
               {header ? <div className="min-w-0">{header}</div> : null}
               <ThemeToggle />
             </div>
