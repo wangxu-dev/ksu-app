@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: --linux
+            artifact_name: linux
+          - os: windows-latest
+            platform: --win
+            artifact_name: windows
+          - os: macos-latest
+            platform: --mac
+            artifact_name: macos
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Check icon files
+        run: |
+          node -e "const fs=require('fs'); const req=['build/icons/icon.icns','build/icons/icon.ico','build/icons/icon.png']; const miss=req.filter(p=>!fs.existsSync(p)); if(miss.length){console.error('Missing icon files:', miss.join(', ')); process.exit(1);} console.log('Icon files OK');"
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Package Electron app
+        run: npx electron-builder@latest --config electron-builder.yml ${{ matrix.platform }} --publish never
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact_name }}
+          path: release/**
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate release notes
+        id: notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const currentTag = context.ref.replace('refs/tags/', '');
+
+            const tagsResp = await github.rest.repos.listTags({ owner, repo, per_page: 100 });
+            const tags = tagsResp.data.map(t => t.name);
+            const currentIndex = tags.findIndex(t => t === currentTag);
+            const previousTag = currentIndex >= 0 && currentIndex + 1 < tags.length ? tags[currentIndex + 1] : null;
+
+            let commits = [];
+            if (previousTag) {
+              const compare = await github.rest.repos.compareCommitsWithBasehead({
+                owner,
+                repo,
+                basehead: `${previousTag}...${currentTag}`,
+              });
+              commits = compare.data.commits || [];
+            } else {
+              const list = await github.rest.repos.listCommits({ owner, repo, per_page: 20 });
+              commits = list.data || [];
+            }
+
+            const header = [
+              `## ${currentTag}`,
+              '',
+              previousTag ? `Changes since ${previousTag}:` : 'Initial tagged release notes:',
+              '',
+            ];
+
+            const lines = commits.slice(0, 200).map(c => {
+              const sha = c.sha.slice(0, 7);
+              const msg = (c.commit.message || '').split('\n')[0];
+              return `- ${msg} (${sha})`;
+            });
+
+            const body = [...header, ...(lines.length ? lines : ['- No commit messages found.']), '', 'Artifacts: Windows / macOS / Linux'].join('\n');
+            core.setOutput('body', body);
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.body }}
+          files: artifacts/**
+          draft: false
+          prerelease: false
