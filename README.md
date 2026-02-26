@@ -5,11 +5,11 @@ A unified portal integrating multiple campus systems for Kashgar University.
 ## Dev
 
 ```bash
-npm run tauri dev
+npm run electron:dev
 ```
 
 ## Build
 
 ```bash
-npm run tauri build
+npm run electron:build
 ```

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { ipcInvoke } from "@/lib/ipc";
 
 export type RequestMode = "frontend" | "backend";
 
@@ -20,8 +20,6 @@ export type ProxyResponsePayload = {
   error?: string;
 };
 
-export async function proxyRequest(
-  payload: ProxyRequestPayload
-): Promise<ProxyResponsePayload> {
-  return invoke<ProxyResponsePayload>("proxy_request", { payload });
+export async function proxyRequest(payload: ProxyRequestPayload): Promise<ProxyResponsePayload> {
+  return ipcInvoke<ProxyResponsePayload>("proxy:request", payload);
 }
