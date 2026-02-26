@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DirectChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
+import { MessageSquareText, Plus, SendHorizontal, Settings2, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,26 +15,12 @@ import {
   getAssistantSettings,
   getConversationMessages,
   listConversations,
-  onAssistantChunk,
-  onAssistantDone,
-  onAssistantError,
+  replaceConversationMessages,
   setAssistantSettings,
-  startAssistantStream,
   type AssistantConversation,
-  type AssistantMessage,
   type AssistantSettings,
 } from "@/lib/assistant/client";
-import { MessageSquareText, Plus, SendHorizontal, Settings2, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  streamId?: string;
-  status?: "streaming" | "done" | "error";
-};
+import { createAssistantAgent } from "@/lib/assistant/agent";
 
 const EMPTY_SETTINGS: AssistantSettings = {
   apiKey: "",
@@ -49,13 +40,62 @@ export function AssistantPage() {
   );
 }
 
+function extractMessageText(message: UIMessage): string {
+  const textParts = message.parts
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join("");
+  if (textParts.trim()) return textParts;
+
+  const toolParts = message.parts.filter(isToolUIPart);
+  if (toolParts.length > 0) {
+    return toolParts
+      .map((part) => {
+        const toolName = getToolName(part);
+        if (part.state === "output-available") {
+          return `调用工具 ${toolName} 成功`;
+        }
+        if (part.state === "output-error") {
+          return `调用工具 ${toolName} 失败`;
+        }
+        return `调用工具 ${toolName}`;
+      })
+      .join("\n");
+  }
+
+  return "";
+}
+
+function toPersistedMessages(
+  messages: UIMessage[],
+): Array<{ role: "user" | "assistant"; content: string }> {
+  return messages
+    .filter(
+      (m): m is UIMessage & { role: "user" | "assistant" } =>
+        m.role === "user" || m.role === "assistant",
+    )
+    .map((m) => ({
+      role: m.role,
+      content: extractMessageText(m),
+    }))
+    .filter((m) => m.content.trim().length > 0);
+}
+
+function toUIMessages(
+  rows: Array<{ id: string; role: "user" | "assistant"; content: string }>,
+): UIMessage[] {
+  return rows.map((m) => ({
+    id: m.id,
+    role: m.role,
+    parts: [{ type: "text", text: m.content }],
+  }));
+}
+
 function AssistantContent() {
-  const [token] = useState(() => getSavedToken() || "");
+  const token = getSavedToken() || "";
   const [prompt, setPrompt] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string>("");
+  const [activeConversationId, setActiveConversationId] = useState("");
   const [settings, setSettings] = useState<AssistantSettings>(EMPTY_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
@@ -66,16 +106,29 @@ function AssistantContent() {
     return items;
   }
 
-  async function loadMessages(conversationId: string) {
-    const rows = await getConversationMessages(conversationId);
-    const mapped: ChatMessage[] = rows.map((m: AssistantMessage) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      status: "done",
-    }));
-    setMessages(mapped);
-  }
+  const agent = useMemo(() => {
+    if (!token || !settings.apiKey) return null;
+    try {
+      return createAssistantAgent(settings, token);
+    } catch {
+      return null;
+    }
+  }, [settings, token]);
+
+  const transport = useMemo(() => {
+    if (!agent) return undefined;
+    return new DirectChatTransport({ agent });
+  }, [agent]);
+
+  const { messages, sendMessage, setMessages, status } = useChat({
+    id: activeConversationId || "assistant",
+    transport: transport as any,
+    onFinish: async ({ messages }) => {
+      if (!activeConversationId) return;
+      await replaceConversationMessages(activeConversationId, toPersistedMessages(messages));
+      await refreshConversations();
+    },
+  });
 
   useEffect(() => {
     Promise.all([refreshConversations(), getAssistantSettings()]).then(async ([items, cfg]) => {
@@ -86,56 +139,23 @@ function AssistantContent() {
         setActiveConversationId(created.id);
         setMessages([]);
       } else {
-        setActiveConversationId(items[0].id);
-        await loadMessages(items[0].id);
+        const first = items[0];
+        setActiveConversationId(first.id);
+        const rows = await getConversationMessages(first.id);
+        setMessages(toUIMessages(rows) as any);
       }
     });
-  }, []);
-
-  useEffect(() => {
-    const offChunk = onAssistantChunk(({ streamId, delta }) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.streamId === streamId
-            ? { ...m, content: `${m.content}${delta}`, status: "streaming" }
-            : m,
-        ),
-      );
-    });
-    const offDone = onAssistantDone(async ({ streamId }) => {
-      setMessages((prev) =>
-        prev.map((m) => (m.streamId === streamId ? { ...m, status: "done" } : m)),
-      );
-      setIsSending(false);
-      if (activeConversationId) {
-        await loadMessages(activeConversationId);
-        await refreshConversations();
-      }
-    });
-    const offError = onAssistantError(({ streamId, error }) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.streamId === streamId
-            ? {
-                ...m,
-                content: m.content ? `${m.content}\n\n[error] ${error}` : `[error] ${error}`,
-                status: "error",
-              }
-            : m,
-        ),
-      );
-      setIsSending(false);
-    });
-    return () => {
-      offChunk();
-      offDone();
-      offError();
-    };
-  }, [activeConversationId]);
+  }, [setMessages]);
 
   const canSend = useMemo(
-    () => !!prompt.trim() && !!token && !!activeConversationId && !isSending,
-    [prompt, token, activeConversationId, isSending],
+    () =>
+      !!prompt.trim() &&
+      !!token &&
+      !!activeConversationId &&
+      !!transport &&
+      status !== "submitted" &&
+      status !== "streaming",
+    [prompt, token, activeConversationId, transport, status],
   );
 
   async function onNewConversation() {
@@ -148,7 +168,8 @@ function AssistantContent() {
 
   async function onSelectConversation(conversationId: string) {
     setActiveConversationId(conversationId);
-    await loadMessages(conversationId);
+    const rows = await getConversationMessages(conversationId);
+    setMessages(toUIMessages(rows) as any);
     setShowConversations(false);
   }
 
@@ -160,51 +181,9 @@ function AssistantContent() {
 
   async function onSend() {
     const text = prompt.trim();
-    if (!text || !token || !activeConversationId || isSending) return;
-
+    if (!canSend || !text) return;
     setPrompt("");
-    setIsSending(true);
-
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-      status: "done",
-    };
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      status: "streaming",
-    };
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
-
-    try {
-      const { streamId } = await startAssistantStream({
-        message: text,
-        token,
-        conversationId: activeConversationId,
-        apiKey: settings.apiKey || undefined,
-        model: settings.model || undefined,
-        baseUrl: settings.baseUrl || undefined,
-      });
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantMessage.id ? { ...m, streamId } : m)),
-      );
-    } catch (error) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMessage.id
-            ? {
-                ...m,
-                content: `[error] ${error instanceof Error ? error.message : "assistant start failed"}`,
-                status: "error",
-              }
-            : m,
-        ),
-      );
-      setIsSending(false);
-    }
+    await sendMessage({ text });
   }
 
   return (
@@ -228,36 +207,39 @@ function AssistantContent() {
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">输入“我是谁”或“我的成绩如何”开始。</p>
         ) : null}
-        {messages.map((m) => (
-          <div key={m.id} className="space-y-1">
-            <div className="text-xs text-muted-foreground">{m.role === "user" ? "你" : "AI"}</div>
-            {m.role === "assistant" ? (
-              <div className="rounded-md bg-muted/60 px-3 py-2 text-sm">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    ul: ({ children }) => (
-                      <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
-                    ),
-                    code: ({ children }) => (
-                      <code className="rounded bg-background px-1 py-0.5">{children}</code>
-                    ),
-                  }}
-                >
-                  {m.content || "..."}
-                </ReactMarkdown>
-              </div>
-            ) : (
-              <div className="whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 text-sm">
-                {m.content || "..."}
-              </div>
-            )}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const content = extractMessageText(m);
+          return (
+            <div key={m.id} className="space-y-1">
+              <div className="text-xs text-muted-foreground">{m.role === "user" ? "你" : "AI"}</div>
+              {m.role === "assistant" ? (
+                <div className="rounded-md bg-muted/60 px-3 py-2 text-sm">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => (
+                        <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
+                      ),
+                      code: ({ children }) => (
+                        <code className="rounded bg-background px-1 py-0.5">{children}</code>
+                      ),
+                    }}
+                  >
+                    {content || "..."}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 text-sm">
+                  {content || "..."}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="border-t px-3 py-2">

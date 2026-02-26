@@ -71,6 +71,7 @@ function createAssistantStore(userDataDir) {
   const listMessagesStmt = db.prepare(
     "SELECT id, conversation_id, role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
   );
+  const deleteMessagesStmt = db.prepare("DELETE FROM messages WHERE conversation_id = ?");
   const setSettingStmt = db.prepare(`
     INSERT INTO settings (key, value)
     VALUES (?, ?)
@@ -128,6 +129,21 @@ function createAssistantStore(userDataDir) {
     updateMessageStmt.run(String(content || ""), id);
   }
 
+  function replaceMessages(conversationId, messages) {
+    const ts = now();
+    const rows = Array.isArray(messages) ? messages : [];
+    const tx = db.transaction(() => {
+      deleteMessagesStmt.run(conversationId);
+      for (const item of rows) {
+        if (!item || (item.role !== "user" && item.role !== "assistant")) continue;
+        const text = String(item.content || "");
+        addMessageStmt.run(randomUUID(), conversationId, item.role, text, now());
+      }
+      touchConversationStmt.run(ts, conversationId);
+    });
+    tx();
+  }
+
   return {
     getSettings,
     setSettings,
@@ -136,6 +152,7 @@ function createAssistantStore(userDataDir) {
     getMessages,
     addMessage,
     updateMessage,
+    replaceMessages,
   };
 }
 

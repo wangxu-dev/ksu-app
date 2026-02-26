@@ -3,6 +3,7 @@ import {
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
+  ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
   ASSISTANT_STREAM_CHUNK_CHANNEL,
@@ -59,6 +60,16 @@ export function createConversation(title?: string): Promise<AssistantConversatio
 
 export function getConversationMessages(conversationId: string): Promise<AssistantMessage[]> {
   return ipcInvoke<AssistantMessage[]>(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, { conversationId });
+}
+
+export function replaceConversationMessages(
+  conversationId: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<{ ok: boolean }> {
+  return ipcInvoke<{ ok: boolean }>(ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL, {
+    conversationId,
+    messages,
+  });
 }
 
 export function getAssistantSettings(): Promise<AssistantSettings> {

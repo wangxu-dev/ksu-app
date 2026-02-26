@@ -15,6 +15,7 @@ const {
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
+  ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
 } = require("./assistant/channels.cjs");
@@ -174,6 +175,11 @@ app.whenReady().then(() => {
   ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload) =>
     assistantStore.getMessages(String(payload?.conversationId || "")),
   );
+  ipcMain.handle(ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL, async (_event, payload) => {
+    const conversationId = String(payload?.conversationId || "");
+    assistantStore.replaceMessages(conversationId, payload?.messages || []);
+    return { ok: true };
+  });
   ipcMain.handle(ASSISTANT_SETTINGS_GET_CHANNEL, async () => assistantStore.getSettings());
   ipcMain.handle(ASSISTANT_SETTINGS_SET_CHANNEL, async (_event, payload) =>
     assistantStore.setSettings(payload || {}),
