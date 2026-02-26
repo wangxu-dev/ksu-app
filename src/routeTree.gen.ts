@@ -8,138 +8,131 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as HomeRouteImport } from './routes/home'
-import { Route as GradesRouteImport } from './routes/grades'
-import { Route as CalendarRouteImport } from './routes/calendar'
-import { Route as AssistantRouteImport } from './routes/assistant'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as LoginRouteImport } from "./routes/login";
+import { Route as HomeRouteImport } from "./routes/home";
+import { Route as GradesRouteImport } from "./routes/grades";
+import { Route as CalendarRouteImport } from "./routes/calendar";
+import { Route as AssistantRouteImport } from "./routes/assistant";
+import { Route as IndexRouteImport } from "./routes/index";
 
 const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+  id: "/login",
+  path: "/login",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
+  id: "/home",
+  path: "/home",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GradesRoute = GradesRouteImport.update({
-  id: '/grades',
-  path: '/grades',
+  id: "/grades",
+  path: "/grades",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+  id: "/calendar",
+  path: "/calendar",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AssistantRoute = AssistantRouteImport.update({
-  id: '/assistant',
-  path: '/assistant',
+  id: "/assistant",
+  path: "/assistant",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/assistant': typeof AssistantRoute
-  '/calendar': typeof CalendarRoute
-  '/grades': typeof GradesRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
+  "/": typeof IndexRoute;
+  "/assistant": typeof AssistantRoute;
+  "/calendar": typeof CalendarRoute;
+  "/grades": typeof GradesRoute;
+  "/home": typeof HomeRoute;
+  "/login": typeof LoginRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/assistant': typeof AssistantRoute
-  '/calendar': typeof CalendarRoute
-  '/grades': typeof GradesRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
+  "/": typeof IndexRoute;
+  "/assistant": typeof AssistantRoute;
+  "/calendar": typeof CalendarRoute;
+  "/grades": typeof GradesRoute;
+  "/home": typeof HomeRoute;
+  "/login": typeof LoginRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/assistant': typeof AssistantRoute
-  '/calendar': typeof CalendarRoute
-  '/grades': typeof GradesRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/assistant": typeof AssistantRoute;
+  "/calendar": typeof CalendarRoute;
+  "/grades": typeof GradesRoute;
+  "/home": typeof HomeRoute;
+  "/login": typeof LoginRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/assistant' | '/calendar' | '/grades' | '/home' | '/login'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/assistant' | '/calendar' | '/grades' | '/home' | '/login'
-  id:
-    | '__root__'
-    | '/'
-    | '/assistant'
-    | '/calendar'
-    | '/grades'
-    | '/home'
-    | '/login'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: "/" | "/assistant" | "/calendar" | "/grades" | "/home" | "/login";
+  fileRoutesByTo: FileRoutesByTo;
+  to: "/" | "/assistant" | "/calendar" | "/grades" | "/home" | "/login";
+  id: "__root__" | "/" | "/assistant" | "/calendar" | "/grades" | "/home" | "/login";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AssistantRoute: typeof AssistantRoute
-  CalendarRoute: typeof CalendarRoute
-  GradesRoute: typeof GradesRoute
-  HomeRoute: typeof HomeRoute
-  LoginRoute: typeof LoginRoute
+  IndexRoute: typeof IndexRoute;
+  AssistantRoute: typeof AssistantRoute;
+  CalendarRoute: typeof CalendarRoute;
+  GradesRoute: typeof GradesRoute;
+  HomeRoute: typeof HomeRoute;
+  LoginRoute: typeof LoginRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/grades': {
-      id: '/grades'
-      path: '/grades'
-      fullPath: '/grades'
-      preLoaderRoute: typeof GradesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/assistant': {
-      id: '/assistant'
-      path: '/assistant'
-      fullPath: '/assistant'
-      preLoaderRoute: typeof AssistantRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/login": {
+      id: "/login";
+      path: "/login";
+      fullPath: "/login";
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/home": {
+      id: "/home";
+      path: "/home";
+      fullPath: "/home";
+      preLoaderRoute: typeof HomeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/grades": {
+      id: "/grades";
+      path: "/grades";
+      fullPath: "/grades";
+      preLoaderRoute: typeof GradesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/calendar": {
+      id: "/calendar";
+      path: "/calendar";
+      fullPath: "/calendar";
+      preLoaderRoute: typeof CalendarRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/assistant": {
+      id: "/assistant";
+      path: "/assistant";
+      fullPath: "/assistant";
+      preLoaderRoute: typeof AssistantRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -150,7 +143,7 @@ const rootRouteChildren: RootRouteChildren = {
   GradesRoute: GradesRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
