@@ -1,16 +1,10 @@
 import { ApiError } from "@/lib/api/client";
-import { proxyRequest } from "@/lib/api/proxy";
 import type { PersonalInfoData, UserInfoData } from "@/lib/auth";
 import type { GradesData, GradesRaw } from "@/lib/grades";
 import type { CalendarDay, CalendarResponse } from "@/lib/calendar";
-
-const USER_INFO_URL = "https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user";
-const PERSONAL_INFO_URL =
-  "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo";
-const GRADES_URL = "https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1";
-const CALENDAR_URL = "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getXlInfo";
-
-const REQUEST_MODE = "frontend" as const;
+import { ipcInvoke } from "@/lib/ipc";
+import { KSU_REQUEST_CHANNEL } from "@/lib/request/channels";
+import type { UnifiedResponsePayload } from "@/lib/request/types";
 
 type UserInfoRaw = {
   code: number;
@@ -34,35 +28,14 @@ type PersonalInfoRaw = {
   data?: PersonalInfoData | null;
 };
 
-function baseHeaders(token: string): Record<string, string> {
-  return {
-    accept: "application/json, text/plain, */*",
-    "x-id-token": token,
-    "x-device-info": "PC",
-    "x-terminal-info": "PC",
-    Referer: "https://portal.ksu.edu.cn/main.html",
-  };
-}
+type KsuEndpoint = "userInfo" | "personalInfo" | "grades" | "calendarMonth";
 
-async function fetchKsuJson<T>(
-  url: string,
-  opts: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-    timeoutMs?: number;
-    followRedirects?: boolean;
-  } = {}
-): Promise<T> {
-  const response = await proxyRequest({
-    requestMode: REQUEST_MODE,
-    method: opts.method ?? "GET",
-    url,
-    headers: opts.headers,
-    body: opts.body,
-    timeoutMs: opts.timeoutMs,
-    followRedirects: opts.followRedirects,
-  });
+async function fetchKsuJson<T>(payload: {
+  endpoint: KsuEndpoint;
+  token: string;
+  yearMonth?: string;
+}): Promise<T> {
+  const response = await ipcInvoke<UnifiedResponsePayload>(KSU_REQUEST_CHANNEL, payload);
 
   if (!response.ok && response.status === 0) {
     throw new ApiError(response.error || "请求失败", { payload: response });
@@ -81,9 +54,9 @@ async function fetchKsuJson<T>(
 }
 
 export async function getUserInfo(token: string): Promise<UserInfoData> {
-  const raw = await fetchKsuJson<UserInfoRaw>(USER_INFO_URL, {
-    headers: baseHeaders(token),
-    timeoutMs: 20_000,
+  const raw = await fetchKsuJson<UserInfoRaw>({
+    endpoint: "userInfo",
+    token,
   });
 
   if (raw.code !== 0 || !raw.data) {
@@ -102,9 +75,9 @@ export async function getUserInfo(token: string): Promise<UserInfoData> {
 }
 
 export async function getPersonalInfo(token: string): Promise<PersonalInfoData> {
-  const raw = await fetchKsuJson<PersonalInfoRaw>(PERSONAL_INFO_URL, {
-    headers: baseHeaders(token),
-    timeoutMs: 20_000,
+  const raw = await fetchKsuJson<PersonalInfoRaw>({
+    endpoint: "personalInfo",
+    token,
   });
 
   if (raw.code !== 0 || !raw.data) {
@@ -115,9 +88,9 @@ export async function getPersonalInfo(token: string): Promise<PersonalInfoData> 
 }
 
 export async function getGrades(token: string): Promise<GradesData> {
-  const raw = await fetchKsuJson<GradesRaw>(GRADES_URL, {
-    headers: baseHeaders(token),
-    timeoutMs: 25_000,
+  const raw = await fetchKsuJson<GradesRaw>({
+    endpoint: "grades",
+    token,
   });
 
   if (!raw.success || raw.code !== 200 || !raw.data) {
@@ -128,15 +101,10 @@ export async function getGrades(token: string): Promise<GradesData> {
 }
 
 export async function getCalendarMonth(token: string, yearMonth: string): Promise<CalendarDay[]> {
-  const url = new URL(CALENDAR_URL);
-  url.searchParams.set("ny", yearMonth);
-  url.searchParams.set("random_number", String(Date.now()));
-
-  const raw = await fetchKsuJson<CalendarResponse>(url.toString(), {
-    headers: {
-      "x-id-token": token,
-    },
-    timeoutMs: 25_000,
+  const raw = await fetchKsuJson<CalendarResponse>({
+    endpoint: "calendarMonth",
+    token,
+    yearMonth,
   });
 
   if (raw.code !== 0) {

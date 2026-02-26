@@ -1,18 +1,16 @@
-import { AppShell } from '@/components/app-shell'
-import { PageHeaderProvider } from '@/components/page-header'
-import { createRootRoute, Outlet, useRouterState } from '@tanstack/react-router'
+import { AppShell } from "@/components/app-shell";
+import { PageHeaderProvider } from "@/components/page-header";
+import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 
 export const Route = createRootRoute({
-  component: () => (
-    <RootLayout />
-  ),
-})
+  component: () => <RootLayout />,
+});
 
 function RootLayout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  if (pathname.startsWith('/login')) {
-    return <Outlet />
+  if (pathname.startsWith("/login")) {
+    return <Outlet />;
   }
 
   return (
@@ -21,5 +19,5 @@ function RootLayout() {
         <Outlet />
       </AppShell>
     </PageHeaderProvider>
-  )
+  );
 }

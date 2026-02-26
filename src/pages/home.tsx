@@ -152,8 +152,12 @@ function HomeContent() {
           <CardTitle className="text-base">个人信息</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="text-xl font-semibold">{user?.user_name ? `你好，${user.user_name}` : "你好"}</div>
-          <div className="text-sm text-muted-foreground">{user?.username ? `学号：${user.username}` : "学号：--"}</div>
+          <div className="text-xl font-semibold">
+            {user?.user_name ? `你好，${user.user_name}` : "你好"}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {user?.username ? `学号：${user.username}` : "学号：--"}
+          </div>
           {user?.organization_name ? (
             <div className="text-sm text-muted-foreground">班级：{user.organization_name}</div>
           ) : null}
@@ -183,40 +187,40 @@ function HomeContent() {
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Stat
-                title="校园卡余额"
-                value={isLoading ? "--" : formatCurrency(personal?.xykye)}
-                unit="元"
-                icon={<Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-              />
-              <Stat
-                title="GPA"
-                value={gpa ?? "--"}
-                icon={<GraduationCap className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />}
-              />
-              <Stat
-                title="教学周"
-                value={week ?? "--"}
-                icon={<CalendarDays className="h-5 w-5 text-sky-600 dark:text-sky-300" />}
-              />
-              <Stat
-                title="课程数"
-                value={isLoading ? "--" : (personal?.kcs ?? "--")}
-                unit="门"
-                icon={<BookOpen className="h-5 w-5 text-amber-700 dark:text-amber-300" />}
-              />
-              <Stat
-                title="科研成果"
-                value={isLoading ? "--" : (personal?.kycg ?? "--")}
-                unit="项"
-                icon={<FlaskConical className="h-5 w-5 text-fuchsia-700 dark:text-fuchsia-300" />}
-              />
-              <Stat
-                title="图书馆借阅"
-                value={isLoading ? "--" : (personal ? `${personal.tszj}/${personal.tsyj}` : "--")}
-                unit="在借/已借"
-                icon={<LibraryBig className="h-5 w-5 text-teal-700 dark:text-teal-300" />}
-              />
+          <Stat
+            title="校园卡余额"
+            value={isLoading ? "--" : formatCurrency(personal?.xykye)}
+            unit="元"
+            icon={<Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+          />
+          <Stat
+            title="GPA"
+            value={gpa ?? "--"}
+            icon={<GraduationCap className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />}
+          />
+          <Stat
+            title="教学周"
+            value={week ?? "--"}
+            icon={<CalendarDays className="h-5 w-5 text-sky-600 dark:text-sky-300" />}
+          />
+          <Stat
+            title="课程数"
+            value={isLoading ? "--" : (personal?.kcs ?? "--")}
+            unit="门"
+            icon={<BookOpen className="h-5 w-5 text-amber-700 dark:text-amber-300" />}
+          />
+          <Stat
+            title="科研成果"
+            value={isLoading ? "--" : (personal?.kycg ?? "--")}
+            unit="项"
+            icon={<FlaskConical className="h-5 w-5 text-fuchsia-700 dark:text-fuchsia-300" />}
+          />
+          <Stat
+            title="图书馆借阅"
+            value={isLoading ? "--" : personal ? `${personal.tszj}/${personal.tsyj}` : "--"}
+            unit="在借/已借"
+            icon={<LibraryBig className="h-5 w-5 text-teal-700 dark:text-teal-300" />}
+          />
         </div>
 
         {personalError ? (

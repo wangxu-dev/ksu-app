@@ -28,11 +28,12 @@ All JWXT API endpoints require **JSESSIONID** cookie obtained after SSO login.
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | xt | jw | System type (教务) |
-| localeKey | zh_CN | Language |
-| _ | timestamp | Cache buster |
+| localeKey | zh*CN | Language |
+| * | timestamp | Cache buster |
 | gnmkdm | index | Function module code |
 
 **Headers**:
+
 ```javascript
 {
   "accept": "text/html, */*; q=0.01",
@@ -59,6 +60,7 @@ All JWXT API endpoints require **JSESSIONID** cookie obtained after SSO login.
 | gnmkdm | index | Function module code |
 
 **Headers**:
+
 ```javascript
 {
   "accept": "text/html, */*; q=0.01",
@@ -103,6 +105,7 @@ All JWXT API endpoints require **JSESSIONID** cookie obtained after SSO login.
 | gnmkdm | N305005 | Grade module code |
 
 **Form Data**:
+
 ```javascript
 {
   xnm: '2024',                    // 学年
@@ -118,6 +121,7 @@ All JWXT API endpoints require **JSESSIONID** cookie obtained after SSO login.
 ```
 
 **Headers**:
+
 ```javascript
 {
   "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
@@ -134,11 +138,13 @@ All JWXT API endpoints require **JSESSIONID** cookie obtained after SSO login.
 **JSESSIONID** cookie is required for all JWXT API calls.
 
 **Example**:
+
 ```
 JSESSIONID=E4ECF29CFF31A805C14C17D316CB0E3E
 ```
 
 **How to obtain**:
+
 1. Complete CAS login (get ticket)
 2. Establish portal session
 3. Call `/sso/ddlogin` and follow redirect chain
@@ -158,11 +164,11 @@ async function getIndexInfo() {
 
   const response = await fetch(url, {
     headers: {
-      'accept': 'text/html, */*; q=0.01',
-      'x-requested-with': 'XMLHttpRequest',
-      'cookie': `JSESSIONID=${jsessionId}`,
-      'Referer': 'https://jwnet.ksu.edu.cn/jwglxt/xtgl/index_initMenu.html?jsdm=xs'
-    }
+      accept: "text/html, */*; q=0.01",
+      "x-requested-with": "XMLHttpRequest",
+      cookie: `JSESSIONID=${jsessionId}`,
+      Referer: "https://jwnet.ksu.edu.cn/jwglxt/xtgl/index_initMenu.html?jsdm=xs",
+    },
   });
 
   return await response.text();
@@ -170,29 +176,30 @@ async function getIndexInfo() {
 
 // Query grades
 async function getGrades(xnm, xqm) {
-  const url = 'https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005';
+  const url = "https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005";
 
   const formData = new URLSearchParams({
-    xnm: xnm,                      // 学年
-    xqm: xqm,                      // 学期
-    _search: 'false',
+    xnm: xnm, // 学年
+    xqm: xqm, // 学期
+    _search: "false",
     nd: Date.now().toString(),
-    'queryModel.showCount': '100',
-    'queryModel.currentPage': '1',
-    'queryModel.sortName': '',
-    'queryModel.sortOrder': 'asc',
-    time: '1'
+    "queryModel.showCount": "100",
+    "queryModel.currentPage": "1",
+    "queryModel.sortName": "",
+    "queryModel.sortOrder": "asc",
+    time: "1",
   });
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-      'cookie': `JSESSIONID=${jsessionId}`,
-      'Referer': 'https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default'
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      cookie: `JSESSIONID=${jsessionId}`,
+      Referer:
+        "https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default",
     },
-    body: formData
+    body: formData,
   });
 
   return await response.json();
@@ -203,10 +210,10 @@ async function getGrades(xnm, xqm) {
 
 ## Module Codes (gnmkdm)
 
-| Code | Module |
-|------|--------|
-| index | 首页/信息 |
-| N305005 | 成绩查询 |
+| Code    | Module    |
+| ------- | --------- |
+| index   | 首页/信息 |
+| N305005 | 成绩查询  |
 
 ---
 
@@ -219,4 +226,4 @@ async function getGrades(xnm, xqm) {
 
 ---
 
-*This document is part of the Ksu-App API reference collection*
+_This document is part of the Ksu-App API reference collection_

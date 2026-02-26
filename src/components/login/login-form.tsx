@@ -25,8 +25,7 @@ export function LoginForm() {
       if (result.token) {
         navigate({ to: "/home" });
       }
-    }
-    catch {
+    } catch {
       // 错误已在 useLogin 中处理
     }
   };
@@ -48,7 +47,9 @@ export function LoginForm() {
       {/* 表单字段 */}
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="username" className="text-sm">学号</Label>
+          <Label htmlFor="username" className="text-sm">
+            学号
+          </Label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -63,7 +64,9 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm">密码</Label>
+          <Label htmlFor="password" className="text-sm">
+            密码
+          </Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -92,16 +95,10 @@ export function LoginForm() {
         </div>
 
         {error && (
-          <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-            {error}
-          </div>
+          <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</div>
         )}
 
-        <Button
-          className="w-full"
-          onClick={handleSubmit}
-          disabled={isLoading || !isValid}
-        >
+        <Button className="w-full" onClick={handleSubmit} disabled={isLoading || !isValid}>
           {isLoading ? "登录中..." : "登录"}
         </Button>
       </div>

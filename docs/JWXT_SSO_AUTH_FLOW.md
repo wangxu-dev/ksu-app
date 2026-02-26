@@ -30,7 +30,7 @@ Portal Session → SSO Login → CAS Redirect → Ticket → SSO Login → ticke
 After CAS login and obtaining the ticket, call the portal ticket URL:
 
 ```javascript
-await api.get(ticketUrl)
+await api.get(ticketUrl);
 // ticketUrl format: https://portal.ksu.edu.cn/?ticket=ST-XXXXXXXX-XXX-XXX-XXX-XXXXXXXXXXX
 ```
 
@@ -43,10 +43,10 @@ await api.get(ticketUrl)
 ### Step 2: Initiate JWXT SSO Login
 
 ```javascript
-const ssoUrl = 'https://jwnet.ksu.edu.cn/sso/ddlogin'
+const ssoUrl = "https://jwnet.ksu.edu.cn/sso/ddlogin";
 const ssoRes = await api.get(ssoUrl, {
-  headers: { Referer: 'https://portal.ksu.edu.cn/' },
-})
+  headers: { Referer: "https://portal.ksu.edu.cn/" },
+});
 ```
 
 **Request Details**:
@@ -73,10 +73,10 @@ https://cas.ksu.edu.cn/cas/login?service=https%3A%2F%2Fjwnet.ksu.edu.cn%2Fsso%2F
 Follow the redirect to CAS:
 
 ```javascript
-let currentUrl = ssoRes.headers.location
+let currentUrl = ssoRes.headers.location;
 // currentUrl: https://cas.ksu.edu.cn/cas/login?service=https%3A%2F%2Fjwnet.ksu.edu.cn%2Fsso%2Fddlogin
 
-const res = await api.get(currentUrl)
+const res = await api.get(currentUrl);
 // Expected: 302 Redirect
 ```
 
@@ -93,10 +93,10 @@ https://jwnet.ksu.edu.cn/sso/ddlogin?ticket=ST-XXXXXXXX-XXX-XXX-XXX-XXXXXXXXXXX
 ### Step 4: SSO Login with Ticket (Second Redirect)
 
 ```javascript
-currentUrl = res.headers.location
+currentUrl = res.headers.location;
 // currentUrl: https://jwnet.ksu.edu.cn/sso/ddlogin?ticket=ST-XXXXXXXX-XXX-XXX-XXX-XXXXXXXXXXX
 
-const res = await api.get(currentUrl)
+const res = await api.get(currentUrl);
 // Expected: 302 Redirect
 ```
 
@@ -113,10 +113,10 @@ https://jwnet.ksu.edu.cn/sso/ddlogin
 ### Step 5: Final SSO Redirect (Third Redirect)
 
 ```javascript
-currentUrl = res.headers.location
+currentUrl = res.headers.location;
 // currentUrl: https://jwnet.ksu.edu.cn/sso/ddlogin
 
-const res = await api.get(currentUrl)
+const res = await api.get(currentUrl);
 // Expected: 302 Redirect
 ```
 
@@ -133,15 +133,15 @@ https://jwnet.ksu.edu.cn/jwglxt/ticketlogin?uid=***********&timestamp=1768361974
 ### Step 6: Ticket Login (Fourth Redirect - May Timeout)
 
 ```javascript
-currentUrl = res.headers.location
+currentUrl = res.headers.location;
 // currentUrl: https://jwnet.ksu.edu.cn/jwglxt/ticketlogin?uid=***********&timestamp=1768361974&verify=8DDBFA62FD8BC931ADE534FDCE7EBBF5
 
 try {
-  const res = await api.get(currentUrl)
+  const res = await api.get(currentUrl);
   // Expected: 200 OK
 } catch (err) {
   // ticketlogin MAY TIMEOUT but session is established
-  if (currentUrl.includes('ticketlogin')) {
+  if (currentUrl.includes("ticketlogin")) {
     // Session is actually valid, continue
   }
 }
@@ -198,7 +198,7 @@ const api = axios.create({
   maxRedirects: 0, // IMPORTANT: Handle redirects manually
   validateStatus: (status) => status >= 200 && status < 400,
   timeout: 60000, // 60 seconds timeout
-})
+});
 ```
 
 ---
@@ -208,40 +208,38 @@ const api = axios.create({
 ### Cookie Interceptor
 
 ```javascript
-let cookieJar = []
+let cookieJar = [];
 
 // Merge cookies from response
 api.interceptors.response.use((response) => {
-  if (response.headers['set-cookie']) {
-    const newCookies = response.headers['set-cookie'].map(
-      (c) => c.split(';')[0],
-    )
-    const cookieMap = new Map()
+  if (response.headers["set-cookie"]) {
+    const newCookies = response.headers["set-cookie"].map((c) => c.split(";")[0]);
+    const cookieMap = new Map();
 
     // Add existing cookies
     cookieJar.forEach((c) => {
-      const name = c.split('=')[0]
-      cookieMap.set(name, c)
-    })
+      const name = c.split("=")[0];
+      cookieMap.set(name, c);
+    });
 
     // Add/overwrite with new cookies
     newCookies.forEach((c) => {
-      const name = c.split('=')[0]
-      cookieMap.set(name, c)
-    })
+      const name = c.split("=")[0];
+      cookieMap.set(name, c);
+    });
 
-    cookieJar = Array.from(cookieMap.values())
+    cookieJar = Array.from(cookieMap.values());
   }
-  return response
-})
+  return response;
+});
 
 // Add cookies to request
 api.interceptors.request.use((config) => {
   if (cookieJar.length) {
-    config.headers.Cookie = cookieJar.join('; ')
+    config.headers.Cookie = cookieJar.join("; ");
   }
-  return config
-})
+  return config;
+});
 ```
 
 ---
@@ -253,49 +251,49 @@ async function performLogin(username, password) {
   // Step 1: CAS login with Puppeteer (previous steps)
   // ... (CAS login code to get ticket and cookies)
 
-  cookieJar = cookies.map((c) => `${c.name}=${c.value}`)
+  cookieJar = cookies.map((c) => `${c.name}=${c.value}`);
 
   // Step 2: Portal login
-  await api.get(ticketUrl)
+  await api.get(ticketUrl);
 
   // Step 3: Initiate JWXT SSO
-  const ssoUrl = 'https://jwnet.ksu.edu.cn/sso/ddlogin'
+  const ssoUrl = "https://jwnet.ksu.edu.cn/sso/ddlogin";
   const ssoRes = await api.get(ssoUrl, {
-    headers: { Referer: 'https://portal.ksu.edu.cn/' },
-  })
+    headers: { Referer: "https://portal.ksu.edu.cn/" },
+  });
 
   if (ssoRes.status !== 302 || !ssoRes.headers.location) {
-    throw new Error('SSO跳转失败')
+    throw new Error("SSO跳转失败");
   }
 
   // Step 4-6: Follow redirect chain
-  let currentUrl = ssoRes.headers.location
+  let currentUrl = ssoRes.headers.location;
 
   for (let i = 0; i < 10; i++) {
     try {
-      const res = await api.get(currentUrl)
+      const res = await api.get(currentUrl);
 
       if (res.status === 200) {
         // Successfully reached final destination
-        break
+        break;
       }
 
       if (res.status === 302 && res.headers.location) {
-        currentUrl = new URL(res.headers.location, currentUrl).href
+        currentUrl = new URL(res.headers.location, currentUrl).href;
       } else {
-        throw new Error(`重定向链中断，状态码: ${res.status}`)
+        throw new Error(`重定向链中断，状态码: ${res.status}`);
       }
     } catch (err) {
       // ticketlogin may timeout but session is valid
-      if (currentUrl.includes('ticketlogin')) {
+      if (currentUrl.includes("ticketlogin")) {
         // Session is actually valid, continue
-        break
+        break;
       }
-      throw err
+      throw err;
     }
   }
 
-  return cookieJar
+  return cookieJar;
 }
 ```
 
@@ -308,18 +306,15 @@ After completing the SSO flow, validate the session:
 ```javascript
 async function validateSession() {
   const gradePageUrl =
-    'https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default'
+    "https://jwnet.ksu.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
 
-  const validationRes = await api.get(gradePageUrl)
+  const validationRes = await api.get(gradePageUrl);
 
-  if (
-    validationRes.status !== 200 ||
-    validationRes.data.includes('<title>错误提示</title>')
-  ) {
-    return { error: 'session_invalid' }
+  if (validationRes.status !== 200 || validationRes.data.includes("<title>错误提示</title>")) {
+    return { error: "session_invalid" };
   }
 
-  return { valid: true }
+  return { valid: true };
 }
 ```
 
@@ -351,7 +346,7 @@ async function validateSession() {
 
 **Query Parameters**:
 
-- `uid`: Student ID (e.g., ****\*\*\*****)
+- `uid`: Student ID (e.g., \***\*\*\*\*\*\***)
 - `timestamp`: Unix timestamp (e.g., 1768361974)
 - `verify`: MD5 hash (e.g., 8DDBFA62FD8BC931ADE534FDCE7EBBF5)
 
