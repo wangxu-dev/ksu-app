@@ -5,7 +5,10 @@ import { callMcpTool, type AssistantSettings } from "@/lib/assistant/client";
 
 async function execTool<T>(name: string, args: Record<string, unknown>): Promise<T> {
   try {
-    return await callMcpTool<T>(name, args);
+    const token = String(args.token || "");
+    const nextArgs = { ...args };
+    delete nextArgs.token;
+    return await callMcpTool<T>(name, nextArgs, { token });
   } catch (error) {
     console.error("[assistant:agent] tool failed", { name, error });
     throw error;

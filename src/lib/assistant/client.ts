@@ -114,11 +114,20 @@ export function listMcpTools(): Promise<McpToolInfo[]> {
     });
 }
 
-export function callMcpTool<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
+export function callMcpTool<T = unknown>(
+  name: string,
+  args?: Record<string, unknown>,
+  options?: { token?: string },
+): Promise<T> {
   const safeArgs = args || {};
-  console.debug("[assistant:mcp] call start", { name, keys: Object.keys(safeArgs) });
+  const token = options?.token || "";
+  console.debug("[assistant:mcp] call start", {
+    name,
+    keys: Object.keys(safeArgs),
+    hasToken: Boolean(token),
+  });
   return withTimeout(
-    ipcInvoke<T>(ASSISTANT_MCP_CALL_TOOL_CHANNEL, { name, args: safeArgs }),
+    ipcInvoke<T>(ASSISTANT_MCP_CALL_TOOL_CHANNEL, { name, args: safeArgs, token }),
     20_000,
     `mcp ${name}`,
   )

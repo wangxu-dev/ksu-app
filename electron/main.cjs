@@ -210,8 +210,9 @@ app.whenReady().then(() => {
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
     const toolName = String(payload?.name || "");
+    const token = String(payload?.token || "");
     try {
-      return await registry.callTool(toolName, payload?.args || {});
+      return await registry.callTool(toolName, payload?.args || {}, { token });
     } catch (error) {
       logger.error("mcp call failed", {
         toolName,
