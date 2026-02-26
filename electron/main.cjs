@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("node:path");
+const fs = require("node:fs");
 const { createLogger } = require("./shared/logger.cjs");
 const { login } = require("./auth/login.cjs");
 const { buildKsuRequest } = require("./ksu/request-builder.cjs");
@@ -25,6 +26,16 @@ const {
 } = require("./assistant/channels.cjs");
 
 const logger = createLogger("main");
+
+function resolveIconPath() {
+  const icoPath = path.join(__dirname, "..", "build", "icons", "icon.ico");
+  const pngPath = path.join(__dirname, "..", "build", "icons", "icon.png");
+  const icnsPath = path.join(__dirname, "..", "build", "icons", "icon.icns");
+
+  if (process.platform === "win32") return icoPath;
+  if (process.platform === "darwin") return icnsPath;
+  return pngPath;
+}
 
 function platformWindowOptions() {
   if (process.platform === "darwin") {
@@ -53,6 +64,15 @@ function buildApplicationMenu() {
 function createWindow() {
   const width = 1200;
   const height = 800;
+  const iconPath = resolveIconPath();
+  const windowIcon =
+    process.platform === "win32"
+      ? iconPath
+      : path.join(__dirname, "..", "build", "icons", "icon.png");
+  const hasWindowIcon = fs.existsSync(windowIcon);
+  if (!hasWindowIcon) {
+    logger.warn("window icon missing", { windowIcon });
+  }
 
   const win = new BrowserWindow({
     width,
@@ -62,6 +82,7 @@ function createWindow() {
     resizable: true,
     maximizable: true,
     fullScreenable: true,
+    icon: hasWindowIcon ? windowIcon : undefined,
     ...platformWindowOptions(),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -145,6 +166,14 @@ function bindInspectContextMenu(win) {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
   logger.info("app ready");
+  if (process.platform === "darwin" && app.dock) {
+    const dockIcon = path.join(__dirname, "..", "build", "icons", "icon.png");
+    if (fs.existsSync(dockIcon)) {
+      app.dock.setIcon(dockIcon);
+    } else {
+      logger.warn("dock icon missing", { dockIcon });
+    }
+  }
   const assistantStore = createAssistantStore(app.getPath("userData"));
   ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) =>
     login(event.sender.session, payload),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DirectChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
 import { MessageSquareText, Plus, SendHorizontal, Settings2, X } from "lucide-react";
@@ -99,6 +99,9 @@ function AssistantContent() {
   const [settings, setSettings] = useState<AssistantSettings>(EMPTY_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesBottomRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshConversations() {
     const items = await listConversations();
@@ -143,6 +146,11 @@ function AssistantContent() {
       parts: last.parts.map((part) => part.type),
     });
   }, [messages, status]);
+
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
+    messagesBottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+  }, [messages, status, shouldAutoScroll]);
 
   useEffect(() => {
     Promise.all([refreshConversations(), getAssistantSettings()]).then(async ([items, cfg]) => {
@@ -197,6 +205,7 @@ function AssistantContent() {
     const text = prompt.trim();
     if (!canSend || !text) return;
     setPrompt("");
+    setShouldAutoScroll(true);
     try {
       await sendMessage({ text });
     } catch (error) {
@@ -221,7 +230,15 @@ function AssistantContent() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4">
+      <div
+        ref={messagesContainerRef}
+        className="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          setShouldAutoScroll(distanceToBottom < 80);
+        }}
+      >
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">输入“我是谁”或“我的成绩如何”开始。</p>
         ) : null}
@@ -303,10 +320,11 @@ function AssistantContent() {
             </div>
           );
         })}
+        <div ref={messagesBottomRef} />
       </div>
 
       <div className="border-t px-4 py-3">
-        <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
+        <div className="flex w-full items-end gap-2 rounded-2xl border bg-muted/20 p-2">
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -320,11 +338,11 @@ function AssistantContent() {
               token ? "输入问题，回车发送，Shift+Enter 换行" : "未检测到登录 token，请先登录"
             }
             rows={2}
-            className="resize-none rounded-xl"
+            className="min-h-[44px] flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           />
           <Button
             size="icon"
-            className="h-10 w-10 rounded-full"
+            className="h-10 w-10 shrink-0 rounded-xl"
             disabled={!canSend}
             onClick={onSend}
           >
