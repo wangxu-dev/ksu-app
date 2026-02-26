@@ -59,7 +59,10 @@ jobs:
           path: |
             release/*.exe
             release/*.dmg
+            release/*.zip
             release/*.AppImage
+            release/*.yml
+            release/*.blockmap
           if-no-files-found: error
 
   release:
@@ -152,6 +155,9 @@ jobs:
           files: |
             artifacts/*.exe
             artifacts/*.dmg
+            artifacts/*.zip
             artifacts/*.AppImage
+            artifacts/*.yml
+            artifacts/*.blockmap
           draft: false
           prerelease: false

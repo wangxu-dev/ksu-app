@@ -18,6 +18,8 @@ mac:
   icon: build/icons/icon.icns
   target:
     - dmg
+    - zip
+  artifactName: "${productName}-${version}-${arch}.${ext}"
 
 win:
   icon: build/icons/icon.ico
@@ -35,3 +37,4 @@ linux:
   icon: build/icons/png
   target:
     - AppImage
+  artifactName: "${productName}-${version}-${arch}.${ext}"
