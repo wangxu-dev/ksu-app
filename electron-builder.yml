@@ -18,16 +18,20 @@ mac:
   icon: build/icons/icon.icns
   target:
     - dmg
-    - zip
 
 win:
   icon: build/icons/icon.ico
   target:
     - nsis
-    - zip
+  artifactName: "${productName}-${version}-setup-${arch}.${ext}"
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
 
 linux:
   icon: build/icons/png
   target:
     - AppImage
-    - tar.gz

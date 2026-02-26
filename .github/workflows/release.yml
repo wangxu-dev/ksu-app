@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -52,7 +56,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.artifact_name }}
-          path: release/**
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
           if-no-files-found: error
 
   release:
@@ -142,6 +149,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.notes.outputs.body }}
-          files: artifacts/**
+          files: |
+            artifacts/*.exe
+            artifacts/*.dmg
+            artifacts/*.AppImage
           draft: false
           prerelease: false
