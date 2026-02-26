@@ -4,12 +4,20 @@ const { login } = require("./auth/login.cjs");
 const { buildKsuRequest } = require("./ksu/request-builder.cjs");
 const { dispatchRequest } = require("./request/dispatcher.cjs");
 const { runAssistantStream } = require("./assistant/runtime.cjs");
+const { createAssistantStore } = require("./assistant/store.cjs");
 const {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
   PROXY_REQUEST_CHANNEL,
 } = require("./request/channels.cjs");
-const { ASSISTANT_STREAM_START_CHANNEL } = require("./assistant/channels.cjs");
+const {
+  ASSISTANT_STREAM_START_CHANNEL,
+  ASSISTANT_CONVERSATION_CREATE_CHANNEL,
+  ASSISTANT_CONVERSATION_LIST_CHANNEL,
+  ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
+  ASSISTANT_SETTINGS_GET_CHANNEL,
+  ASSISTANT_SETTINGS_SET_CHANNEL,
+} = require("./assistant/channels.cjs");
 
 function platformWindowOptions() {
   if (process.platform === "darwin") {
@@ -129,6 +137,7 @@ function bindInspectContextMenu(win) {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
+  const assistantStore = createAssistantStore(app.getPath("userData"));
   ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) =>
     login(event.sender.session, payload),
   );
@@ -152,8 +161,22 @@ app.whenReady().then(() => {
     runAssistantStream({
       event,
       payload,
+      store: assistantStore,
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     }),
+  );
+  ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload) =>
+    assistantStore.createConversation(payload?.title),
+  );
+  ipcMain.handle(ASSISTANT_CONVERSATION_LIST_CHANNEL, async () =>
+    assistantStore.listConversations(),
+  );
+  ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload) =>
+    assistantStore.getMessages(String(payload?.conversationId || "")),
+  );
+  ipcMain.handle(ASSISTANT_SETTINGS_GET_CHANNEL, async () => assistantStore.getSettings());
+  ipcMain.handle(ASSISTANT_SETTINGS_SET_CHANNEL, async (_event, payload) =>
+    assistantStore.setSettings(payload || {}),
   );
   createWindow();
 });

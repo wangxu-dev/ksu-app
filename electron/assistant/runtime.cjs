@@ -30,19 +30,24 @@ function buildSystemPrompt() {
   ].join("\n");
 }
 
-function resolveOpenAIConfig(payload) {
-  const apiKey = payload?.apiKey || process.env.OPENAI_API_KEY || "";
-  const model = payload?.model || process.env.OPENAI_MODEL || "gpt-4o-mini";
-  const baseURL = payload?.baseUrl || process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
+function resolveOpenAIConfig(payload, settings) {
+  const apiKey = payload?.apiKey || settings?.apiKey || process.env.OPENAI_API_KEY || "";
+  const model =
+    payload?.model || settings?.model || process.env.OPENAI_MODEL || "openai/gpt-4o-mini";
+  const baseURL =
+    payload?.baseUrl ||
+    settings?.baseUrl ||
+    process.env.OPENAI_BASE_URL ||
+    "https://openrouter.ai/api/v1";
   if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
   return { apiKey, model, baseURL };
 }
 
-async function runAssistantStream({ event, payload, callKsuEndpoint }) {
+async function runAssistantStream({ event, payload, callKsuEndpoint, store }) {
   const streamId = randomUUID();
   const message = String(payload?.message || "").trim();
   const token = String(payload?.token || "").trim();
-  const history = Array.isArray(payload?.history) ? payload.history : [];
+  const conversationId = String(payload?.conversationId || "");
 
   if (!message) {
     emitError(event, streamId, new Error("message is required"));
@@ -52,27 +57,36 @@ async function runAssistantStream({ event, payload, callKsuEndpoint }) {
     emitError(event, streamId, new Error("token is required"));
     return { streamId };
   }
+  if (!conversationId) {
+    emitError(event, streamId, new Error("conversationId is required"));
+    return { streamId };
+  }
 
   queueMicrotask(async () => {
     try {
-      const { apiKey, model, baseURL } = resolveOpenAIConfig(payload);
+      const settings = store.getSettings();
+      const { apiKey, model, baseURL } = resolveOpenAIConfig(payload, settings);
       const { streamText, tool } = await import("ai");
       const { createOpenAI } = await import("@ai-sdk/openai");
       const { z } = await import("zod");
 
       const openai = createOpenAI({ apiKey, baseURL });
       const ksu = buildKsuMcpTools({ callKsuEndpoint, token });
-      const modelMessages = history
-        .filter((item) => item && (item.role === "user" || item.role === "assistant"))
-        .map((item) => ({
-          role: item.role,
-          content: String(item.content || ""),
-        }))
-        .filter((item) => item.content.trim().length > 0);
+      const modelMessages = store
+        .getMessages(conversationId)
+        .filter(
+          (item) => (item.role === "user" || item.role === "assistant") && item.content.trim(),
+        )
+        .map((item) => ({ role: item.role, content: item.content }));
+      store.addMessage(conversationId, "user", message);
+      const assistantMessageId = store.addMessage(conversationId, "assistant", "");
+      const systemPrompt = settings.systemPrompt
+        ? `${buildSystemPrompt()}\n\n${settings.systemPrompt}`
+        : buildSystemPrompt();
 
       const result = streamText({
         model: openai.chat(model),
-        system: buildSystemPrompt(),
+        system: systemPrompt,
         messages: [...modelMessages, { role: "user", content: message }],
         tools: {
           get_user_info: tool({
@@ -99,9 +113,14 @@ async function runAssistantStream({ event, payload, callKsuEndpoint }) {
           }),
         },
       });
+      let aggregated = "";
 
       for await (const delta of result.textStream) {
-        if (delta) emitChunk(event, streamId, delta);
+        if (delta) {
+          aggregated += delta;
+          store.updateMessage(assistantMessageId, aggregated);
+          emitChunk(event, streamId, delta);
+        }
       }
       emitDone(event, streamId);
     } catch (error) {
