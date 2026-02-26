@@ -15,6 +15,7 @@ Example: "Your Majesty, TypeCheck has passed", "As you command, proceeding immed
 **Ksu-App** is a unified portal integrating multiple campus systems for Kashgar University. It's a desktop application built with Tauri 2.0, React, and Rust.
 
 **Architecture Philosophy:**
+
 - Local-first: All data stored locally (SQLite), no cloud dependencies
 - Integration-focused: Acts as a gateway to existing university systems
 - Companion assistant: Helps with course selection, grade tracking, academic planning
@@ -38,6 +39,7 @@ npm run tauri build
 ## Technology Stack
 
 ### Frontend
+
 - **Framework**: React 19 + TypeScript
 - **Routing**: TanStack Router (file-based routing)
 - **State Management**: TanStack Query
@@ -46,6 +48,7 @@ npm run tauri build
 - **Path Alias**: `@/*` maps to `src/*`
 
 ### Backend (Rust)
+
 - **Framework**: Tauri 2.0
 - **Async Runtime**: tokio (full features)
 - **HTTP Client**: reqwest
@@ -82,24 +85,28 @@ src-tauri/
 ## Important Conventions
 
 ### File-Based Routing
+
 - Routes are auto-generated from `src/routes/` directory
 - Run `npx tsr generate` after adding/removing route files
 - **Never manually edit** `src/routeTree.gen.ts` (auto-generated)
 - `__root.tsx` = root layout, `index.tsx` = `/`, `login.tsx` = `/login`
 
 ### Component Organization
+
 - **Feature components**: `src/components/{feature}/` (e.g., `login/`)
 - **UI components**: `src/components/ui/` (managed by shadcn)
 - **Avoid over-decoupling**: Only extract components/hooks when genuinely reusable
 - Keep simple state inline with components
 
 ### Tauri Commands (Rust Backend)
+
 - Commands defined in `src-tauri/src/lib.rs` with `#[tauri::command]`
 - Frontend calls: `invoke('command_name', { param })`
 - All async operations use tokio
 - Error handling: `Result<T, String>` for simple cases, `anyhow::Error` internally
 
 ### App Metadata
+
 - **Product Name**: Ksu-App
 - **Bundle ID**: dev.wangxu.ksuApp
 - **Version**: 0.0.1
@@ -128,11 +135,13 @@ src-tauri/
 ## Development Style & Decisions
 
 ### Technology Selection Principles
+
 - **Modern but stable**: Prefer cutting-edge toolchain (TanStack, Tailwind v4, garde)
 - **Rust modernization**: sqlx (compile-time SQL checking), tokio, anyhow, tracing - avoid legacy tools
 - **TypeSafe**: Emphasize type safety on both frontend and backend, Garde as Zod equivalent
 
 ### Code Style
+
 - **Pragmatism**: Components must have real value, don't split for the sake of splitting
 - **Avoid over-decoupling**:
   - 7-line `logo-header.tsx` deleted, inlined into form
@@ -141,21 +150,24 @@ src-tauri/
 - **Simplicity first**: Keep it simple when possible
 
 ### Workflow
+
 - **Documentation first**: Check official docs before trying anything
 - **Respect auto-generation**: Never manually edit `routeTree.gen.ts`, shadcn components, etc.
 - **TypeCheck must pass**: Ensure `npm run typecheck` passes after every change
 
 ### Project Positioning Decisions
+
 - **Local-first**: All data in local SQLite, no cloud dependencies
 - **Data source**: Call university APIs, we're not the data source
 - **Companion assistant**: Help with course selection, credit analysis, academic planning - NOT a course-snatching tool
 - **Version strategy**: Start from 0.0.1, iterate in small steps
 
 ### Decision Log
-| Decision | Value | Reason |
-|----------|-------|--------|
-| Bundle ID | dev.wangxu.ksuApp | Personal domain + project name |
-| Routing | File-based | TanStack official recommendation |
-| Icon background | White | Clear visibility at small sizes |
-| Git author | No Co-Authored-By | Keep it clean |
-| Login entry | Required | Campus system requires auth |
+
+| Decision        | Value             | Reason                           |
+| --------------- | ----------------- | -------------------------------- |
+| Bundle ID       | dev.wangxu.ksuApp | Personal domain + project name   |
+| Routing         | File-based        | TanStack official recommendation |
+| Icon background | White             | Clear visibility at small sizes  |
+| Git author      | No Co-Authored-By | Keep it clean                    |
+| Login entry     | Required          | Campus system requires auth      |

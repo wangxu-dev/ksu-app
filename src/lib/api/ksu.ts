@@ -52,7 +52,7 @@ async function fetchKsuJson<T>(
     body?: string;
     timeoutMs?: number;
     followRedirects?: boolean;
-  } = {}
+  } = {},
 ): Promise<T> {
   const response = await proxyRequest({
     requestMode: REQUEST_MODE,

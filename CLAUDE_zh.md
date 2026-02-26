@@ -15,6 +15,7 @@
 **Ksu-App** 是喀什大学的校园统一门户，集成多个校内系统。基于 Tauri 2.0、React 和 Rust 构建的桌面应用。
 
 **架构理念：**
+
 - 本地优先：所有数据本地存储（SQLite），无云端依赖
 - 集成为主：作为现有学校系统的统一入口
 - 伴学助手：辅助选课、成绩查询、学业规划
@@ -38,6 +39,7 @@ npm run tauri build
 ## 技术栈
 
 ### 前端
+
 - **框架**: React 19 + TypeScript
 - **路由**: TanStack Router（文件路由）
 - **状态管理**: TanStack Query
@@ -46,6 +48,7 @@ npm run tauri build
 - **路径别名**: `@/*` 映射到 `src/*`
 
 ### 后端 (Rust)
+
 - **框架**: Tauri 2.0
 - **异步运行时**: tokio（完整特性）
 - **HTTP 客户端**: reqwest
@@ -82,24 +85,28 @@ src-tauri/
 ## 重要约定
 
 ### 文件路由
+
 - 路由从 `src/routes/` 目录自动生成
 - 添加/删除路由文件后运行 `npx tsr generate`
 - **禁止手动编辑** `src/routeTree.gen.ts`（自动生成）
 - `__root.tsx` = 根布局，`index.tsx` = `/`，`login.tsx` = `/login`
 
 ### 组件组织
+
 - **功能组件**: `src/components/{功能}/`（如 `login/`）
 - **UI 组件**: `src/components/ui/`（shadcn 管理）
 - **避免过度解耦**: 只在真正可复用时才提取组件/hook
 - 简单状态保持与组件内联
 
 ### Tauri 命令（Rust 后端）
+
 - 命令定义在 `src-tauri/src/lib.rs`，使用 `#[tauri::command]`
 - 前端调用：`invoke('command_name', { param })`
 - 所有异步操作使用 tokio
 - 错误处理：简单情况用 `Result<T, String>`，内部用 `anyhow::Error`
 
 ### 应用元数据
+
 - **产品名称**: Ksu-App
 - **包名**: dev.wangxu.ksuApp
 - **版本**: 0.0.1
@@ -128,11 +135,13 @@ src-tauri/
 ## 开发风格与决策记录
 
 ### 技术选型原则
+
 - **前沿但稳定**：优先使用现代工具链（TanStack 全家桶、Tailwind v4、garde）
 - **Rust 现代化**：sqlx（编译时检查 SQL）、tokio、anyhow、tracing，避免旧版工具
 - **TypeSafe**：前端后端都强调类型安全，Garde 对应 Zod
 
 ### 代码风格
+
 - **实用主义**：组件必须有实际价值，不为了拆分而拆分
 - **避免过度解耦**：
   - 7 行的 `logo-header.tsx` 被删除，直接内联到表单
@@ -141,21 +150,24 @@ src-tauri/
 - **简洁优先**：能简单就不要复杂
 
 ### 工作方式
+
 - **先查文档再动手**：遇到问题先查官方文档，不要瞎试
 - **尊重自动生成**：`routeTree.gen.ts`、shadcn 组件等自动生成的文件禁止手动修改
 - **TypeCheck 必须过**：每次改动后必须确保 `npm run typecheck` 通过
 
 ### 项目定位决策
+
 - **本地优先**：所有数据存储在本地 SQLite，不依赖云端
 - **数据来源**：调用学校 API，我们不做数据源
 - **伴学助手**：辅助选课、学分分析、学业规划，不是抢课工具
 - **版本策略**：从 0.0.1 开始，小步迭代
 
 ### 已做决策记录
-| 决策 | 值 | 原因 |
-|------|-----|------|
-| 包名 | dev.wangxu.ksuApp | 个人域名 + 项目名 |
-| 路由方式 | 文件路由 | TanStack 官方推荐 |
-| 图标背景 | 白色 | 小尺寸下清晰可见 |
-| Git 作者 | 不添加 Co-Authored-By | 保持简洁 |
-| 登录入口 | 必须登录后使用 | 校园系统需要认证 |
+
+| 决策     | 值                    | 原因              |
+| -------- | --------------------- | ----------------- |
+| 包名     | dev.wangxu.ksuApp     | 个人域名 + 项目名 |
+| 路由方式 | 文件路由              | TanStack 官方推荐 |
+| 图标背景 | 白色                  | 小尺寸下清晰可见  |
+| Git 作者 | 不添加 Co-Authored-By | 保持简洁          |
+| 登录入口 | 必须登录后使用        | 校园系统需要认证  |

@@ -330,34 +330,34 @@ x-terminal-info: PC
 
 ```javascript
 function extractIdToken(ticket) {
-  const parts = ticket.split('.')
+  const parts = ticket.split(".");
   if (parts.length === 3) {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-    return payload.idToken
+    const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+    return payload.idToken;
   }
-  return null
+  return null;
 }
 ```
 
 #### Grade API Request
 
 ```javascript
-async function getGrades(token, semesterYear = '2025-2026') {
+async function getGrades(token, semesterYear = "2025-2026") {
   const response = await fetch(
     `https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1&semesterYear=${semesterYear}`,
     {
       headers: {
-        'x-id-token': token,
-        Referer: 'https://score-inquiry.ksu.edu.cn/ui/',
+        "x-id-token": token,
+        Referer: "https://score-inquiry.ksu.edu.cn/ui/",
       },
     },
-  )
+  );
 
-  const data = await response.json()
+  const data = await response.json();
   if (data.success) {
-    return data.data
+    return data.data;
   } else {
-    throw new Error(data.msg || '获取成绩失败')
+    throw new Error(data.msg || "获取成绩失败");
   }
 }
 ```

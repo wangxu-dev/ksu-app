@@ -54,6 +54,7 @@
 ## Request Headers
 
 **Required Headers**:
+
 ```javascript
 {
   "accept": "application/json, text/plain, */*",
@@ -74,19 +75,20 @@
 
 ### Key Headers
 
-| Header | Value | Source |
-|--------|-------|--------|
-| x-id-token | JWT token from CAS login | CAS ticket payload |
-| Referer | `https://portal.ksu.edu.cn/main.html` | Fixed |
-| x-device-info | PC | Fixed |
-| x-terminal-info | PC | Fixed |
-| cookie | Portal session cookies | After portal login |
+| Header          | Value                                 | Source             |
+| --------------- | ------------------------------------- | ------------------ |
+| x-id-token      | JWT token from CAS login              | CAS ticket payload |
+| Referer         | `https://portal.ksu.edu.cn/main.html` | Fixed              |
+| x-device-info   | PC                                    | Fixed              |
+| x-terminal-info | PC                                    | Fixed              |
+| cookie          | Portal session cookies                | After portal login |
 
 ---
 
 ## Cookie Requirements
 
 **Required Cookies** (example):
+
 ```
 Hm_lvt_23846a0bdebe934dc3495247ab78cec6=1751977943,1752383463
 Hm_lvt_13d25967c163952b40b7b86f66fd5ecf=1771303807
@@ -103,23 +105,23 @@ Hm_lpvt_13d25967c163952b40b7b86f66fd5ecf=1771303845
 
 ```javascript
 async function getColumnContents(columnId, token, cookies) {
-  const url = new URL('https://portal.ksu.edu.cn/portal-api/v1/cms/content/getColumncontents');
-  url.searchParams.set('kw', '');
-  url.searchParams.set('columnId', columnId);
-  url.searchParams.set('pageNo', '1');
-  url.searchParams.set('pageSize', '12');
-  url.searchParams.set('loadContent', 'false');
-  url.searchParams.set('loadPicContents', 'false');
+  const url = new URL("https://portal.ksu.edu.cn/portal-api/v1/cms/content/getColumncontents");
+  url.searchParams.set("kw", "");
+  url.searchParams.set("columnId", columnId);
+  url.searchParams.set("pageNo", "1");
+  url.searchParams.set("pageSize", "12");
+  url.searchParams.set("loadContent", "false");
+  url.searchParams.set("loadPicContents", "false");
 
   const response = await fetch(url.toString(), {
     headers: {
-      'accept': 'application/json, text/plain, */*',
-      'x-id-token': token,
-      'x-device-info': 'PC',
-      'x-terminal-info': 'PC',
-      'cookie': cookies,
-      'Referer': 'https://portal.ksu.edu.cn/main.html'
-    }
+      accept: "application/json, text/plain, */*",
+      "x-id-token": token,
+      "x-device-info": "PC",
+      "x-terminal-info": "PC",
+      cookie: cookies,
+      Referer: "https://portal.ksu.edu.cn/main.html",
+    },
   });
 
   return await response.json();
@@ -137,4 +139,4 @@ async function getColumnContents(columnId, token, cookies) {
 
 ---
 
-*This document is part of the Ksu-App API reference collection*
+_This document is part of the Ksu-App API reference collection_
