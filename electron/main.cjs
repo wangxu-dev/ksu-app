@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("node:path");
 const { login } = require("./auth/login.cjs");
 const { buildKsuRequest } = require("./ksu/request-builder.cjs");
@@ -9,12 +9,43 @@ const {
   PROXY_REQUEST_CHANNEL,
 } = require("./request/channels.cjs");
 
+function platformWindowOptions() {
+  if (process.platform === "darwin") {
+    return {
+      titleBarStyle: "default",
+      autoHideMenuBar: false,
+    };
+  }
+
+  return {
+    autoHideMenuBar: true,
+    titleBarStyle: "default",
+  };
+}
+
+function buildApplicationMenu() {
+  if (process.platform === "darwin") {
+    // Keep native mac app/window behavior but remove File/Edit style menus.
+    return Menu.buildFromTemplate([{ role: "appMenu" }, { role: "windowMenu" }]);
+  }
+
+  // On Windows/Linux we don't need a classic menu bar.
+  return null;
+}
+
 function createWindow() {
+  const width = 1200;
+  const height = 800;
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 1000,
-    minHeight: 700,
+    width,
+    height,
+    minWidth: 800,
+    minHeight: 600,
+    resizable: true,
+    maximizable: true,
+    fullScreenable: true,
+    ...platformWindowOptions(),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -27,6 +58,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(buildApplicationMenu());
   ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) =>
     login(event.sender.session, payload),
   );
