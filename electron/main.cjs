@@ -3,11 +3,13 @@ const path = require("node:path");
 const { login } = require("./auth/login.cjs");
 const { buildKsuRequest } = require("./ksu/request-builder.cjs");
 const { dispatchRequest } = require("./request/dispatcher.cjs");
+const { runAssistantStream } = require("./assistant/runtime.cjs");
 const {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
   PROXY_REQUEST_CHANNEL,
 } = require("./request/channels.cjs");
+const { ASSISTANT_STREAM_START_CHANNEL } = require("./assistant/channels.cjs");
 
 function platformWindowOptions() {
   if (process.platform === "darwin") {
@@ -55,6 +57,74 @@ function createWindow() {
 
   const devUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:1420";
   win.loadURL(devUrl);
+  bindClipboardShortcuts(win);
+  bindDevtoolsShortcuts(win);
+  bindInspectContextMenu(win);
+}
+
+function bindClipboardShortcuts(win) {
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const hasModifier = !!input.meta || !!input.control;
+    if (!hasModifier) return;
+    const key = String(input.key || "").toLowerCase();
+
+    if (key === "v") {
+      win.webContents.paste();
+      event.preventDefault();
+      return;
+    }
+    if (key === "c") {
+      win.webContents.copy();
+      event.preventDefault();
+      return;
+    }
+    if (key === "x") {
+      win.webContents.cut();
+      event.preventDefault();
+      return;
+    }
+    if (key === "a") {
+      win.webContents.selectAll();
+      event.preventDefault();
+    }
+  });
+}
+
+function bindDevtoolsShortcuts(win) {
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const key = String(input.key || "").toLowerCase();
+    const withMeta = !!input.meta && !!input.alt && key === "i";
+    const withCtrlShift = !!input.control && !!input.shift && key === "i";
+    const withF12 = key === "f12";
+
+    if (withMeta || withCtrlShift || withF12) {
+      if (win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+      } else {
+        win.webContents.openDevTools({ mode: "detach" });
+      }
+      event.preventDefault();
+    }
+  });
+}
+
+function bindInspectContextMenu(win) {
+  win.webContents.on("context-menu", (_event, params) => {
+    const menu = Menu.buildFromTemplate([
+      {
+        label: "Inspect",
+        click: () => {
+          win.webContents.inspectElement(params.x, params.y);
+          if (!win.webContents.isDevToolsOpened()) {
+            win.webContents.openDevTools({ mode: "detach" });
+          }
+        },
+      },
+    ]);
+    menu.popup();
+  });
 }
 
 app.whenReady().then(() => {
@@ -77,6 +147,13 @@ app.whenReady().then(() => {
   });
   ipcMain.handle(PROXY_REQUEST_CHANNEL, async (event, payload) =>
     dispatchRequest(ipcMain, event, payload),
+  );
+  ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload) =>
+    runAssistantStream({
+      event,
+      payload,
+      callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
+    }),
   );
   createWindow();
 });
