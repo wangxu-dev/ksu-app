@@ -41,7 +41,7 @@ function buildKsuRequest(payload) {
       method: "GET",
       url: url.toString(),
       headers: baseHeaders(token),
-      timeoutMs: 20_000,
+      timeoutMs: 35_000,
     };
   }
 
@@ -71,7 +71,7 @@ function buildKsuRequest(payload) {
       headers: {
         "x-id-token": token,
       },
-      timeoutMs: 25_000,
+      timeoutMs: 35_000,
     };
   }
 
