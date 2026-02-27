@@ -120,6 +120,11 @@ async function runAssistantStream({ event, payload, callKsuEndpoint, store }) {
             }),
             execute: async ({ yearMonth }) => ksu.get_calendar({ yearMonth }),
           }),
+          get_current_time: tool({
+            description: "获取当前设备时间",
+            inputSchema: z.object({}),
+            execute: async () => ksu.get_current_time(),
+          }),
         },
       });
       let aggregated = "";

@@ -40,6 +40,7 @@ function toolDisplayName(name: string): string {
   if (name === "get_personal_info") return "个人信息";
   if (name === "get_grades") return "成绩数据";
   if (name === "get_calendar") return "校历信息";
+  if (name === "get_current_time") return "本机时间";
   return name;
 }
 
@@ -268,12 +269,12 @@ function AssistantContent() {
               <div className="max-w-[82%] space-y-2">
                 {isUser ? (
                   <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
-                    <div className="whitespace-pre-wrap break-words">
+                    <div className="whitespace-pre-wrap wrap-break-word">
                       {content || "处理中（等待发送）..."}
                     </div>
                   </div>
                 ) : hasText ? (
-                  <div className="rounded-2xl rounded-bl-md border bg-muted/20 px-4 py-3 text-sm leading-7 text-foreground">
+                  <div className="px-1 py-0.5 text-sm leading-7 text-foreground">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
@@ -327,7 +328,7 @@ function AssistantContent() {
               token ? "输入问题，回车发送，Shift+Enter 换行" : "未检测到登录 token，请先登录"
             }
             rows={2}
-            className="min-h-[46px] flex-1 resize-none border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+            className="min-h-11.5 flex-1 resize-none border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
           />
           <Button
             size="icon"
@@ -348,7 +349,7 @@ function AssistantContent() {
               <X />
             </Button>
           </div>
-          <div className="max-h-[380px] space-y-1 overflow-auto">
+          <div className="max-h-95 space-y-1 overflow-auto">
             {conversations.map((c) => (
               <button
                 key={c.id}
@@ -367,7 +368,7 @@ function AssistantContent() {
       ) : null}
 
       {showSettings ? (
-        <div className="absolute right-3 top-12 z-20 w-[360px] rounded-lg border bg-background p-3 shadow-xl">
+        <div className="absolute right-3 top-12 z-20 w-90 rounded-lg border bg-background p-3 shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-sm font-medium">设置</div>
             <Button variant="ghost" size="icon" onClick={() => setShowSettings(false)}>
