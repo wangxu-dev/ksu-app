@@ -3,6 +3,14 @@ import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 import { callMcpTool, type AssistantSettings } from "@/lib/assistant/client";
 
+function currentDateText() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}年${m}月${d}日`;
+}
+
 async function execTool<T>(name: string, args: Record<string, unknown>): Promise<T> {
   try {
     const token = String(args.token || "");
@@ -28,6 +36,7 @@ export function createAssistantAgent(settings: AssistantSettings, token: string)
     "你是 Ksu-App 内置助手。",
     "优先使用工具回答关于用户信息、成绩、校历的问题。",
     "回答要简洁、准确。",
+    `当前日期：${currentDateText()}`,
     settings.systemPrompt || "",
   ]
     .filter(Boolean)

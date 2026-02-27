@@ -21,11 +21,20 @@ function emitError(event, streamId, error) {
   });
 }
 
+function currentDateText() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}年${m}月${d}日`;
+}
+
 function buildSystemPrompt() {
   return [
     "你是 Ksu-App 内置助手。",
     "你只能通过 ksu_mcp 工具访问学校数据。",
     "回答要简洁、准确、可执行。",
+    `当前日期：${currentDateText()}`,
     "如果工具返回为空或失败，明确说明并建议用户重试。",
   ].join("\n");
 }

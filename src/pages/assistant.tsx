@@ -35,6 +35,14 @@ type ToolActivity = {
   label: string;
 };
 
+function toolDisplayName(name: string): string {
+  if (name === "get_user_info") return "身份信息";
+  if (name === "get_personal_info") return "个人信息";
+  if (name === "get_grades") return "成绩数据";
+  if (name === "get_calendar") return "校历信息";
+  return name;
+}
+
 export function AssistantPage() {
   return (
     <>
@@ -56,13 +64,14 @@ function extractMessageText(message: UIMessage): string {
 function extractToolActivities(message: UIMessage): ToolActivity[] {
   return message.parts.filter(isToolUIPart).map((part) => {
     const name = getToolName(part);
+    const display = toolDisplayName(name);
     if (part.state === "output-available") {
-      return { name, state: "success", label: `工具 ${name} 已完成` };
+      return { name, state: "success", label: display };
     }
     if (part.state === "output-error") {
-      return { name, state: "error", label: `工具 ${name} 调用失败` };
+      return { name, state: "error", label: display };
     }
-    return { name, state: "running", label: `工具 ${name} 执行中` };
+    return { name, state: "running", label: display };
   });
 }
 
@@ -149,7 +158,7 @@ function AssistantContent() {
 
   useEffect(() => {
     if (!shouldAutoScroll) return;
-    messagesBottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    messagesBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status, shouldAutoScroll]);
 
   useEffect(() => {
@@ -214,9 +223,9 @@ function AssistantContent() {
   }
 
   return (
-    <div className="relative mx-auto flex h-[calc(100vh-10rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-background">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <div className="truncate text-sm font-medium">AI 对话</div>
+    <div className="relative mx-auto flex h-[calc(100vh-9.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border bg-background shadow-sm">
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="truncate text-sm font-medium">对话</div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setShowConversations((v) => !v)}>
             <MessageSquareText />
@@ -232,7 +241,7 @@ function AssistantContent() {
 
       <div
         ref={messagesContainerRef}
-        className="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4"
+        className="min-h-0 flex-1 space-y-6 overflow-auto px-6 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={(e) => {
           const el = e.currentTarget;
           const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -244,76 +253,56 @@ function AssistantContent() {
         ) : null}
         {messages.map((m) => {
           const content = extractMessageText(m);
-          const toolActivities = extractToolActivities(m);
+          const toolActivities = extractToolActivities(m).filter(
+            (activity) => activity.state === "running",
+          );
           const isUser = m.role === "user";
+          const hasText = content.trim().length > 0;
           const shouldShowWaiting =
-            !isUser &&
-            status === "streaming" &&
-            content.trim().length === 0 &&
-            toolActivities.length === 0;
+            !isUser && status === "streaming" && !hasText && toolActivities.length === 0;
+          const shouldShowToolRunning = !isUser && !hasText && toolActivities.length > 0;
+          const runningToolNames = toolActivities.map((activity) => activity.label).join("、");
 
           return (
             <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-              <div className="max-w-[78%] space-y-2">
-                <div
-                  className={`text-xs ${
-                    isUser
-                      ? "text-right text-muted-foreground/80"
-                      : "text-left text-muted-foreground"
-                  }`}
-                >
-                  {isUser ? "你" : "AI"}
-                </div>
-
+              <div className="max-w-[82%] space-y-2">
                 {isUser ? (
-                  <div className="rounded-2xl bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
+                  <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
                     <div className="whitespace-pre-wrap break-words">
                       {content || "处理中（等待发送）..."}
                     </div>
                   </div>
-                ) : (
-                  <div className="text-sm leading-7 text-foreground">
-                    {content.trim().length > 0 ? (
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => (
-                            <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
-                          ),
-                          code: ({ children }) => (
-                            <code className="rounded bg-muted px-1 py-0.5">{children}</code>
-                          ),
-                        }}
-                      >
-                        {content}
-                      </ReactMarkdown>
-                    ) : null}
-                    {shouldShowWaiting ? (
-                      <div className="text-sm text-muted-foreground">思考中...</div>
-                    ) : null}
+                ) : hasText ? (
+                  <div className="rounded-2xl rounded-bl-md border bg-muted/20 px-4 py-3 text-sm leading-7 text-foreground">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => (
+                          <ul className="mb-2 list-disc pl-5 last:mb-0">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="mb-2 list-decimal pl-5 last:mb-0">{children}</ol>
+                        ),
+                        code: ({ children }) => (
+                          <code className="rounded bg-muted px-1 py-0.5">{children}</code>
+                        ),
+                      }}
+                    >
+                      {content}
+                    </ReactMarkdown>
                   </div>
-                )}
+                ) : null}
 
-                {!isUser && toolActivities.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {toolActivities.map((activity, index) => (
-                      <div
-                        key={`${activity.name}-${index}`}
-                        className={`rounded-full px-3 py-1 text-xs ${
-                          activity.state === "error"
-                            ? "bg-destructive/10 text-destructive"
-                            : activity.state === "success"
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                              : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {activity.label}
-                      </div>
-                    ))}
+                {shouldShowWaiting ? (
+                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
+                    思考中...
+                  </div>
+                ) : null}
+
+                {shouldShowToolRunning ? (
+                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
+                    {runningToolNames}
                   </div>
                 ) : null}
               </div>
@@ -323,8 +312,8 @@ function AssistantContent() {
         <div ref={messagesBottomRef} />
       </div>
 
-      <div className="border-t px-4 py-3">
-        <div className="flex w-full items-end gap-2 rounded-2xl border bg-muted/20 p-2">
+      <div className="border-t bg-background/80 px-5 py-4">
+        <div className="mx-auto flex w-full max-w-4xl items-end gap-2 rounded-2xl border bg-muted/20 p-2.5">
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -338,7 +327,7 @@ function AssistantContent() {
               token ? "输入问题，回车发送，Shift+Enter 换行" : "未检测到登录 token，请先登录"
             }
             rows={2}
-            className="min-h-[44px] flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+            className="min-h-[46px] flex-1 resize-none border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
           />
           <Button
             size="icon"
