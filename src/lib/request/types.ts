@@ -8,6 +8,8 @@ export type UnifiedRequestPayload = {
   body?: string;
   timeoutMs?: number;
   followRedirects?: boolean;
+  retryCount?: number;
+  retryDelayMs?: number;
 };
 
 export type UnifiedResponsePayload = {

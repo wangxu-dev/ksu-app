@@ -7,9 +7,7 @@ const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
 function shouldRetryError(error) {
   const message = error instanceof Error ? error.message : String(error || "");
   return (
-    message.includes("aborted") ||
-    message.includes("Timeout") ||
-    message.includes("timed out")
+    message.includes("aborted") || message.includes("Timeout") || message.includes("timed out")
   );
 }
 
@@ -54,46 +52,54 @@ async function executeOnce(electronSession, payload, timeoutMs) {
 async function requestViaMain(electronSession, payload) {
   const timeoutMs = payload.timeoutMs ?? 30_000;
   const method = String(payload.method || "GET").toUpperCase();
+  const retryCount = Math.max(0, Number(payload.retryCount || 0));
+  const retryDelayMs = Math.max(0, Number(payload.retryDelayMs || 350));
 
-  try {
-    const first = await executeOnce(electronSession, payload, timeoutMs);
-    if (!shouldRetryResponse(method, first.status)) return first;
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      const result = await executeOnce(electronSession, payload, timeoutMs);
+      const shouldRetry = attempt < retryCount && shouldRetryResponse(method, result.status);
+      if (!shouldRetry) return result;
 
-    logger.warn("retrying request after retryable status", {
-      url: payload.url,
-      method,
-      status: first.status,
-    });
-    await sleep(350);
-    return await executeOnce(electronSession, payload, timeoutMs);
-  } catch (error) {
-    if (method === "GET" && shouldRetryError(error)) {
-      logger.warn("retrying request after transient error", {
+      logger.warn("retrying request after retryable status", {
         url: payload.url,
         method,
-        error: error instanceof Error ? error.message : String(error),
+        status: result.status,
+        attempt: attempt + 1,
+        retryCount,
       });
-      try {
-        await sleep(350);
-        return await executeOnce(electronSession, payload, timeoutMs);
-      } catch (retryError) {
-        return {
-          ok: false,
-          status: 0,
-          headers: {},
-          body: "",
-          error: retryError instanceof Error ? retryError.message : "main requester failed",
-        };
+      await sleep(retryDelayMs);
+      continue;
+    } catch (error) {
+      const shouldRetry = attempt < retryCount && method === "GET" && shouldRetryError(error);
+      if (shouldRetry) {
+        logger.warn("retrying request after transient error", {
+          url: payload.url,
+          method,
+          error: error instanceof Error ? error.message : String(error),
+          attempt: attempt + 1,
+          retryCount,
+        });
+        await sleep(retryDelayMs);
+        continue;
       }
+      return {
+        ok: false,
+        status: 0,
+        headers: {},
+        body: "",
+        error: error instanceof Error ? error.message : "main requester failed",
+      };
     }
-    return {
-      ok: false,
-      status: 0,
-      headers: {},
-      body: "",
-      error: error instanceof Error ? error.message : "main requester failed",
-    };
   }
+
+  return {
+    ok: false,
+    status: 0,
+    headers: {},
+    body: "",
+    error: "main requester failed",
+  };
 }
 
 module.exports = {

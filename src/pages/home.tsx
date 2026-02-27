@@ -45,66 +45,51 @@ function HomeContent() {
       return;
     }
 
-    setIsLoading(true);
-    fetchDashboard(token)
-      .then((data) => {
+    const load = async () => {
+      setIsLoading(true);
+      setPersonalError(null);
+      try {
+        const data = await fetchDashboard(token);
         if (canceled) return;
         setPersonal(data);
-        setPersonalError(null);
-      })
-      .catch((e) => {
+      } catch (e) {
         if (canceled) return;
         setPersonal(null);
         setPersonalError(e instanceof Error ? e.message : "获取个人信息失败");
-      })
-      .finally(() => {
+      } finally {
+        if (!canceled) {
+          setIsLoading(false);
+        }
+      }
+
+      try {
+        const res = await getGradesCached(token, { maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
         if (canceled) return;
-        setIsLoading(false);
-      });
+        setGpa(res.data.gpa);
+      } catch {
+        // ignore
+      }
+
+      const ym = formatYearMonth(new Date());
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const res = await getCalendarMonthCached(token, ym, {
+          maxAgeMs: 30 * 24 * 60 * 60 * 1000,
+        });
+        if (canceled) return;
+        const day = res.data.find((d) => d.rq === today);
+        setWeek(day ? weekText(day.zc) : null);
+      } catch {
+        // ignore
+      }
+    };
+
+    void load();
 
     return () => {
       canceled = true;
     };
   }, [token, navigate]);
-
-  useEffect(() => {
-    let canceled = false;
-    if (!token) return;
-
-    getGradesCached(token, { maxAgeMs: 7 * 24 * 60 * 60 * 1000 })
-      .then((res) => {
-        if (canceled) return;
-        setGpa(res.data.gpa);
-      })
-      .catch(() => {
-        // ignore
-      });
-
-    return () => {
-      canceled = true;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    let canceled = false;
-    if (!token) return;
-    const ym = formatYearMonth(new Date());
-    const today = new Date().toISOString().slice(0, 10);
-
-    getCalendarMonthCached(token, ym, { maxAgeMs: 30 * 24 * 60 * 60 * 1000 })
-      .then((res) => {
-        if (canceled) return;
-        const day = res.data.find((d) => d.rq === today);
-        setWeek(day ? weekText(day.zc) : null);
-      })
-      .catch(() => {
-        // ignore
-      });
-
-    return () => {
-      canceled = true;
-    };
-  }, [token]);
 
   const formatCurrency = (v?: string) => {
     if (!v) return "--";

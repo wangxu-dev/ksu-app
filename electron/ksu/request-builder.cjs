@@ -29,6 +29,8 @@ function buildKsuRequest(payload) {
       url: USER_INFO_URL,
       headers: baseHeaders(token),
       timeoutMs: 20_000,
+      retryCount: 1,
+      retryDelayMs: 300,
     };
   }
 
@@ -42,6 +44,8 @@ function buildKsuRequest(payload) {
       url: url.toString(),
       headers: baseHeaders(token),
       timeoutMs: 35_000,
+      retryCount: 1,
+      retryDelayMs: 350,
     };
   }
 
@@ -72,6 +76,8 @@ function buildKsuRequest(payload) {
         "x-id-token": token,
       },
       timeoutMs: 35_000,
+      retryCount: 1,
+      retryDelayMs: 350,
     };
   }
 

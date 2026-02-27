@@ -22,6 +22,25 @@ type LoginResponse = {
   message: string;
 };
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getUserInfoWithRetry(token: string, retryCount = 1): Promise<UserInfoData> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      return await getUserInfo(token);
+    } catch (error) {
+      lastError = error;
+      if (attempt < retryCount) {
+        await sleep(300);
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("获取用户信息失败");
+}
+
 export async function loginWithBackend(opts: {
   username: string;
   password: string;
@@ -36,7 +55,17 @@ export async function loginWithBackend(opts: {
     throw new Error(result.message || "登录失败");
   }
 
-  const user = await getUserInfo(result.token);
+  let user: UserInfoData;
+  try {
+    user = await getUserInfoWithRetry(result.token, 1);
+  } catch {
+    user = {
+      username: opts.username,
+      user_name: opts.username,
+      user_uid: "",
+      user_id: "",
+    };
+  }
   saveAuth(result.token, user);
 
   if (opts.rememberAccount) saveRememberedAccount(opts.username);
@@ -46,7 +75,7 @@ export async function loginWithBackend(opts: {
 }
 
 export async function validateToken(token: string): Promise<UserInfoData> {
-  const user = await getUserInfo(token);
+  const user = await getUserInfoWithRetry(token, 1);
   saveAuth(token, user);
   return user;
 }

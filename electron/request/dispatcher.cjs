@@ -22,6 +22,8 @@ function normalizePayload(payload) {
     body: payload.body,
     timeoutMs: payload.timeoutMs,
     followRedirects: payload.followRedirects,
+    retryCount: Number(payload.retryCount || 0),
+    retryDelayMs: Number(payload.retryDelayMs || 350),
   };
 }
 
@@ -47,6 +49,7 @@ async function dispatchRequest(ipcMain, event, payload) {
     method: request.method,
     url: request.url,
     timeoutMs: request.timeoutMs,
+    retryCount: request.retryCount,
   });
   if (request.mode === "main") {
     return requestViaMain(event.sender.session, request);
