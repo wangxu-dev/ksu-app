@@ -231,9 +231,19 @@ app.whenReady().then(() => {
     }
   }
   const assistantStore = createAssistantStore(app.getPath("userData"));
-  ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) =>
-    login(event.sender.session, payload),
-  );
+  ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) => {
+    try {
+      logger.info("auth login request received");
+      const result = await login(event.sender.session, payload || {});
+      logger.info("auth login request completed", { success: !!result?.success });
+      return result;
+    } catch (error) {
+      logger.error("auth login request failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
   ipcMain.handle(KSU_REQUEST_CHANNEL, async (event, payload) => {
     try {
       return await dispatchRequest(ipcMain, event, buildKsuRequest(payload));
