@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { User, Lock } from "lucide-react";
 import { useLogin } from "@/hooks/use-login";
 import { useNavigate } from "@tanstack/react-router";
+import { publicAsset } from "@/lib/assets";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -36,7 +37,7 @@ export function LoginForm() {
     <div className="w-full max-w-sm space-y-5">
       {/* Logo */}
       <div className="flex justify-center">
-        <img src="/ksu.svg" alt="KSU" className="h-14 w-14" />
+        <img src={publicAsset("ksu.svg")} alt="KSU" className="h-14 w-14" />
       </div>
 
       {/* 标题 */}

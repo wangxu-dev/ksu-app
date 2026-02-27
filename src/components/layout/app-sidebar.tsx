@@ -2,6 +2,7 @@ import { NAV_ITEMS } from "@/components/layout/app-nav";
 import { cn } from "@/lib/utils";
 import { getSavedUser } from "@/lib/auth";
 import { logout } from "@/lib/auth/service";
+import { publicAsset } from "@/lib/assets";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { PanelLeft, LogOut } from "lucide-react";
 import { useMemo } from "react";
@@ -37,7 +38,7 @@ export function AppSidebar({
         <div className="grid grid-cols-[var(--sidebar-icon-col)_1fr_var(--sidebar-icon-col)] items-center">
           <div className="relative grid h-10 w-[--sidebar-icon-col] place-items-center">
             <img
-              src="/ksu.png"
+              src={publicAsset("ksu.png")}
               alt="KSU"
               className={cn(
                 "h-6 w-6 object-contain transition-opacity duration-150",

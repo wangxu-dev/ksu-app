@@ -120,6 +120,23 @@ function createWindow() {
       isPackaged: app.isPackaged,
     });
   });
+  win.webContents.on("did-finish-load", () => {
+    logger.info("renderer did finish load", {
+      url: win.webContents.getURL(),
+      isPackaged: app.isPackaged,
+    });
+  });
+  win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    logger.error("renderer console message", {
+      level,
+      message,
+      line,
+      sourceId,
+    });
+  });
+  win.webContents.on("render-process-gone", (_event, details) => {
+    logger.error("renderer process gone", details || {});
+  });
   bindClipboardShortcuts(win);
   bindDevtoolsShortcuts(win);
   bindInspectContextMenu(win);

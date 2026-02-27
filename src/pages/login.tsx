@@ -1,17 +1,18 @@
 import { useMemo } from "react";
 import { LoginForm } from "@/components/login/login-form";
+import { publicAsset } from "@/lib/assets";
 
 const CAMPUS_IMAGES = [
-  "/CampusAndSnowPeak.png",
+  "CampusAndSnowPeak.png",
   // "/CampusClockTower.png",
   // "/CampusComplex.png",
-  "/CampusLakePark.png",
-  "/CampusPanorama.png",
+  "CampusLakePark.png",
+  "CampusPanorama.png",
 ] as const;
 
 export function LoginPage() {
   const randomImage = useMemo(
-    () => CAMPUS_IMAGES[Math.floor(Math.random() * CAMPUS_IMAGES.length)],
+    () => publicAsset(CAMPUS_IMAGES[Math.floor(Math.random() * CAMPUS_IMAGES.length)]),
     [],
   );
 
