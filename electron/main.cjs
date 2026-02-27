@@ -99,7 +99,27 @@ function createWindow() {
   });
 
   const devUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:1420";
-  win.loadURL(devUrl);
+  if (app.isPackaged) {
+    const indexPath = path.join(__dirname, "..", "dist", "index.html");
+    if (fs.existsSync(indexPath)) {
+      logger.info("loading packaged renderer", { indexPath });
+      win.loadFile(indexPath);
+    } else {
+      logger.error("packaged renderer entry missing", { indexPath });
+    }
+  } else {
+    logger.info("loading dev renderer", { devUrl });
+    win.loadURL(devUrl);
+  }
+
+  win.webContents.on("did-fail-load", (_event, code, description, validatedURL) => {
+    logger.error("renderer failed to load", {
+      code,
+      description,
+      validatedURL,
+      isPackaged: app.isPackaged,
+    });
+  });
   bindClipboardShortcuts(win);
   bindDevtoolsShortcuts(win);
   bindInspectContextMenu(win);
