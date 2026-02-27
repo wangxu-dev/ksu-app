@@ -9,6 +9,8 @@
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on tcp:1420 && electron .\"",
     "build": "tsr generate && tsc && vite build",
     "electron:build": "npm run build",
+    "pack:dir": "npm run build && electron-builder --config electron-builder.yml --dir --publish never",
+    "pack:local": "npm run build && electron-builder --config electron-builder.yml --publish never",
     "icons:electron": "python scripts/generate_electron_icons.py",
     "preview": "vite preview",
     "typecheck": "tsr generate && tsc -noEmit",
