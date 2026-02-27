@@ -58,6 +58,16 @@ Ksu-App is an Electron desktop app with a built-in AI assistant.
 - Keep modules separated by layer: `request`, `ksu`, `assistant/tools`.
 - Never manually edit `src/routeTree.gen.ts`.
 
+## Collaboration Notes (Owner Preferences)
+
+- Keep implementation pragmatic and directly executable.
+- Avoid mixing concerns; especially keep preload/bridge as a thin IPC surface only.
+- Prefer explicit architecture boundaries over convenience shortcuts.
+- Deliver in small, testable increments and keep commits scoped.
+- Run formatting, linting, and type checks before handoff.
+- Do not hide runtime failures: preserve actionable debug logs and error context.
+- UI should stay clean and minimal; internal tool mechanics should not leak into normal user-facing output.
+
 ## Commands
 
 ```bash

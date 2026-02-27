@@ -7,7 +7,7 @@ This project uses GitHub Releases as the default update source, with an EdgeOne 
 - Primary: `https://github.com/wangxu-dev/ksu-app/releases/download`
 - Fallback: `https://edgeone.gh-proxy.org/https://github.com/wangxu-dev/ksu-app/releases/download`
 
-Update source constants are defined in `electron/updater/sources.cjs`.
+Update source constants are defined in `electron/updater/sources.ts`.
 
 ## Client Runtime Dependency
 

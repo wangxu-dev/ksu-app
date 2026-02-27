@@ -46,3 +46,14 @@ npm run typecheck
 - Do not hand-edit `src/routeTree.gen.ts`.
 - Keep layering strict: `request` / `auth` / `ksu` / `assistant`.
 - Keep all assistant/tool types in TypeScript.
+
+## Collaboration Preferences (Project Owner)
+
+- Prioritize practical, stable delivery over theory-only proposals.
+- Keep bridge/preload minimal: no business logic in bridge code.
+- Enforce explicit decoupling and clear module boundaries.
+- Prefer small, verifiable batches with clear commit boundaries.
+- Always validate with `format/lint/typecheck` before shipping.
+- Avoid over-design and avoid hidden technical debt.
+- Keep logs explicit and useful during debugging; do not suppress root-cause signals.
+- Keep UX behavior predictable: clear statuses, no noisy internal implementation details in final UI.
