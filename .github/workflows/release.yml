@@ -28,6 +28,8 @@ jobs:
             platform: --mac
             artifact_name: macos
     runs-on: ${{ matrix.os }}
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
     steps:
       - name: Checkout
@@ -42,6 +44,16 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-cache-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-cache-
+
       - name: Check icon files
         run: |
           node -e "const fs=require('fs'); const req=['build/icons/icon.icns','build/icons/icon.ico','build/icons/icon.png']; const miss=req.filter(p=>!fs.existsSync(p)); if(miss.length){console.error('Missing icon files:', miss.join(', ')); process.exit(1);} console.log('Icon files OK');"
@@ -49,8 +61,25 @@ jobs:
       - name: Build frontend assets
         run: npm run build
 
-      - name: Package Electron app
-        run: npx electron-builder@latest --config electron-builder.yml ${{ matrix.platform }} --publish never
+      - name: Package Electron app (with retry)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ATTEMPTS=3
+          for i in $(seq 1 "$ATTEMPTS"); do
+            echo "Packaging attempt $i/$ATTEMPTS"
+            if npx electron-builder --config electron-builder.yml ${{ matrix.platform }} --publish never; then
+              echo "Packaging succeeded on attempt $i"
+              exit 0
+            fi
+            if [ "$i" -lt "$ATTEMPTS" ]; then
+              SLEEP_SEC=$((i * 10))
+              echo "Packaging failed, retrying in ${SLEEP_SEC}s..."
+              sleep "$SLEEP_SEC"
+            fi
+          done
+          echo "Packaging failed after ${ATTEMPTS} attempts"
+          exit 1
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -93,16 +122,24 @@ jobs:
             function extractFromChangelog(tagName) {
               if (!fs.existsSync(changelogPath)) return null;
               const content = fs.readFileSync(changelogPath, 'utf8');
-              const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const escapedNoV = tagName.replace(/^v/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const regex = new RegExp(
-                `^##\\s*\\[?(?:${escaped}|${escapedNoV})\\]?[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|\\Z)`,
-                'm',
-              );
-              const match = content.match(regex);
-              if (!match) return null;
-              const notes = match[1].trim();
-              return notes.length > 0 ? notes : null;
+              const tagNoV = tagName.replace(/^v/, '');
+              const sectionRegex = /^##\s+(.+)$/gm;
+              const sections = [];
+              let match;
+              while ((match = sectionRegex.exec(content)) !== null) {
+                sections.push({ title: match[1].trim(), index: match.index, end: sectionRegex.lastIndex });
+              }
+              for (let i = 0; i < sections.length; i += 1) {
+                const s = sections[i];
+                const title = s.title.replace(/^\[|\]$/g, '');
+                const isTarget = title.startsWith(tagName) || title.startsWith(tagNoV);
+                if (!isTarget) continue;
+                const bodyStart = s.end;
+                const bodyEnd = i + 1 < sections.length ? sections[i + 1].index : content.length;
+                const notes = content.slice(bodyStart, bodyEnd).trim();
+                return notes.length > 0 ? notes : null;
+              }
+              return null;
             }
 
             const changelogNotes = extractFromChangelog(currentTag);
@@ -119,6 +156,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: Ksu-App ${{ github.ref_name }}
           body: ${{ steps.notes.outputs.body }}
           files: |
             artifacts/*.exe

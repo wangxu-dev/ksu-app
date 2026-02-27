@@ -1,7 +1,9 @@
 {
   "name": "ksu-app",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "private": true,
+  "description": "Ksu-App desktop client with campus data and built-in assistant.",
+  "author": "wangxu-dev",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
