@@ -1,5 +1,9 @@
-const { sessionFetch } = require("./session-fetch.cjs");
-const { createLogger } = require("../shared/logger.cjs");
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+const { sessionFetch } = require("./session-fetch.js");
+const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("request:main");
 const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
@@ -102,6 +106,4 @@ async function requestViaMain(electronSession, payload) {
   };
 }
 
-module.exports = {
-  requestViaMain,
-};
+export { requestViaMain };

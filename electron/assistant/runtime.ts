@@ -1,10 +1,14 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 const { randomUUID } = require("node:crypto");
-const { buildKsuMcpTools } = require("./ksu-mcp.cjs");
+const { buildKsuMcpTools } = require("./ksu-mcp.js");
 const {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
   ASSISTANT_STREAM_ERROR_CHANNEL,
-} = require("./channels.cjs");
+} = require("./channels.js");
 
 function emitChunk(event, streamId, delta) {
   event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta });
@@ -145,6 +149,4 @@ async function runAssistantStream({ event, payload, callKsuEndpoint, store }) {
   return { streamId };
 }
 
-module.exports = {
-  runAssistantStream,
-};
+export { runAssistantStream };

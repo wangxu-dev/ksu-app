@@ -1,3 +1,4 @@
+// @ts-nocheck
 const ASSISTANT_STREAM_START_CHANNEL = "assistant:stream:start";
 const ASSISTANT_STREAM_CHUNK_CHANNEL = "assistant:stream:chunk";
 const ASSISTANT_STREAM_DONE_CHANNEL = "assistant:stream:done";
@@ -11,7 +12,7 @@ const ASSISTANT_SETTINGS_SET_CHANNEL = "assistant:settings:set";
 const ASSISTANT_MCP_LIST_TOOLS_CHANNEL = "assistant:mcp:list-tools";
 const ASSISTANT_MCP_CALL_TOOL_CHANNEL = "assistant:mcp:call-tool";
 
-module.exports = {
+export {
   ASSISTANT_STREAM_START_CHANNEL,
   ASSISTANT_STREAM_CHUNK_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,

@@ -1,7 +1,11 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 const LOGIN_URL =
   "https://cas.ksu.edu.cn/cas/login?service=https%3A%2F%2Fportal.ksu.edu.cn%2F%3Fpath%3Dhttps%253A%252F%252Fportal.ksu.edu.cn%252Fmain.html%2523%252F";
-const { sessionFetch } = require("../request/session-fetch.cjs");
-const { createLogger } = require("../shared/logger.cjs");
+const { sessionFetch } = require("../request/session-fetch.js");
+const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("auth:login");
 const LOGIN_PAGE_RETRY_LIMIT = 2;
@@ -147,6 +151,4 @@ async function login(electronSession, { username, password }) {
   };
 }
 
-module.exports = {
-  login,
-};
+export { login };

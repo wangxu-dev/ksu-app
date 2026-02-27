@@ -1,3 +1,4 @@
+// @ts-nocheck
 const USER_INFO_URL = "https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user";
 const PERSONAL_INFO_URL =
   "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo";
@@ -84,6 +85,4 @@ function buildKsuRequest(payload) {
   throw new Error(`unsupported endpoint: ${endpoint}`);
 }
 
-module.exports = {
-  buildKsuRequest,
-};
+export { buildKsuRequest };

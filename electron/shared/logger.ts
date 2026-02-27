@@ -1,3 +1,4 @@
+// @ts-nocheck
 const LEVEL_PRIORITY = {
   error: 0,
   warn: 1,
@@ -60,6 +61,4 @@ function createLogger(scope) {
   };
 }
 
-module.exports = {
-  createLogger,
-};
+export { createLogger };

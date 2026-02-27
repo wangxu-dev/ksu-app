@@ -1,4 +1,8 @@
-const { UPDATE_SOURCES } = require("./sources.cjs");
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+const { UPDATE_SOURCES } = require("./sources.js");
 
 const DEFAULT_STATUS = {
   state: "idle",
@@ -204,6 +208,4 @@ function createUpdateManager({ app, logger, publish }) {
   };
 }
 
-module.exports = {
-  createUpdateManager,
-};
+export { createUpdateManager };

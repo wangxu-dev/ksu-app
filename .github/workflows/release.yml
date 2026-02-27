@@ -58,8 +58,8 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const req=['build/icons/icon.icns','build/icons/icon.ico','build/icons/icon.png']; const miss=req.filter(p=>!fs.existsSync(p)); if(miss.length){console.error('Missing icon files:', miss.join(', ')); process.exit(1);} console.log('Icon files OK');"
 
-      - name: Build frontend assets
-        run: npm run build
+      - name: Build app assets
+        run: npm run electron:build
 
       - name: Package Electron app (with retry)
         shell: bash

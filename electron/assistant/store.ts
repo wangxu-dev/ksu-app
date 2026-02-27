@@ -1,8 +1,12 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
-const { createLogger } = require("../shared/logger.cjs");
+const { createLogger } = require("../shared/logger.js");
 
 const DEFAULT_SETTINGS = {
   baseUrl: "https://openrouter.ai/api/v1",
@@ -170,6 +174,4 @@ function createAssistantStore(userDataDir) {
   };
 }
 
-module.exports = {
-  createAssistantStore,
-};
+export { createAssistantStore };

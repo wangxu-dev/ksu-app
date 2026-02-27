@@ -1,7 +1,11 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { z } = require("zod");
-const { createLogger } = require("../../shared/logger.cjs");
-const { getCurrentTimePayload } = require("../../shared/time.cjs");
+const { createLogger } = require("../../shared/logger.js");
+const { getCurrentTimePayload } = require("../../shared/time.js");
 
 const logger = createLogger("assistant:mcp");
 
@@ -118,6 +122,4 @@ function createKsuMcpRegistry({ callKsuEndpoint }) {
   };
 }
 
-module.exports = {
-  createKsuMcpRegistry,
-};
+export { createKsuMcpRegistry };

@@ -1,25 +1,32 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { fileURLToPath } = require("node:url");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = require("node:path").dirname(__filename);
+
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
-const { createLogger } = require("./shared/logger.cjs");
-const { login } = require("./auth/login.cjs");
-const { buildKsuRequest } = require("./ksu/request-builder.cjs");
-const { dispatchRequest } = require("./request/dispatcher.cjs");
-const { runAssistantStream } = require("./assistant/runtime.cjs");
-const { createAssistantStore } = require("./assistant/store.cjs");
-const { createKsuMcpRegistry } = require("./assistant/mcp/ksu-mcp.cjs");
-const { createUpdateManager } = require("./updater/manager.cjs");
+const { createLogger } = require("./shared/logger.js");
+const { login } = require("./auth/login.js");
+const { buildKsuRequest } = require("./ksu/request-builder.js");
+const { dispatchRequest } = require("./request/dispatcher.js");
+const { runAssistantStream } = require("./assistant/runtime.js");
+const { createAssistantStore } = require("./assistant/store.js");
+const { createKsuMcpRegistry } = require("./assistant/mcp/ksu-mcp.js");
+const { createUpdateManager } = require("./updater/manager.js");
 const {
   APP_UPDATE_STATUS_CHANNEL,
   APP_UPDATE_GET_STATUS_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
-} = require("./updater/channels.cjs");
+} = require("./updater/channels.js");
 const {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
   PROXY_REQUEST_CHANNEL,
-} = require("./request/channels.cjs");
+} = require("./request/channels.js");
 const {
   ASSISTANT_STREAM_START_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
@@ -30,7 +37,7 @@ const {
   ASSISTANT_SETTINGS_SET_CHANNEL,
   ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
   ASSISTANT_MCP_CALL_TOOL_CHANNEL,
-} = require("./assistant/channels.cjs");
+} = require("./assistant/channels.js");
 
 const logger = createLogger("main");
 

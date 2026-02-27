@@ -1,4 +1,9 @@
-const { createLogger } = require("../shared/logger.cjs");
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+// @ts-nocheck
+const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("request:session");
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -66,6 +71,4 @@ async function sessionFetch(electronSession, url, init = {}) {
   return response;
 }
 
-module.exports = {
-  sessionFetch,
-};
+export { sessionFetch };

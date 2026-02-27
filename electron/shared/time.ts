@@ -1,3 +1,4 @@
+// @ts-nocheck
 function getCurrentTimePayload() {
   const now = new Date();
   const y = now.getFullYear();
@@ -18,6 +19,4 @@ function getCurrentTimePayload() {
   };
 }
 
-module.exports = {
-  getCurrentTimePayload,
-};
+export { getCurrentTimePayload };

@@ -1,7 +1,11 @@
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
 const { BrowserWindow } = require("electron");
 const { randomUUID } = require("node:crypto");
-const { REQUESTER_RESULT_CHANNEL, REQUESTER_TASK_CHANNEL } = require("./channels.cjs");
-const { createLogger } = require("../shared/logger.cjs");
+const { REQUESTER_RESULT_CHANNEL, REQUESTER_TASK_CHANNEL } = require("./channels.js");
+const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("request:renderer");
 
@@ -79,6 +83,4 @@ function requestViaRenderer(ipcMain, event, payload) {
   });
 }
 
-module.exports = {
-  requestViaRenderer,
-};
+export { requestViaRenderer };

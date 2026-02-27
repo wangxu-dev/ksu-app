@@ -1,4 +1,9 @@
-const { getCurrentTimePayload } = require("../shared/time.cjs");
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+// @ts-nocheck
+const { getCurrentTimePayload } = require("../shared/time.js");
 
 function parseJsonBody(response) {
   if (!response.ok) {
@@ -56,6 +61,4 @@ function buildKsuMcpTools({ callKsuEndpoint, token }) {
   };
 }
 
-module.exports = {
-  buildKsuMcpTools,
-};
+export { buildKsuMcpTools };

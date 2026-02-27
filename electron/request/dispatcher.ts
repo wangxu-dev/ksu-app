@@ -1,6 +1,10 @@
-const { requestViaMain } = require("./main-requester.cjs");
-const { requestViaRenderer } = require("./renderer-requester.cjs");
-const { createLogger } = require("../shared/logger.cjs");
+// @ts-nocheck
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+
+const { requestViaMain } = require("./main-requester.js");
+const { requestViaRenderer } = require("./renderer-requester.js");
+const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("request:dispatcher");
 
@@ -57,6 +61,4 @@ async function dispatchRequest(ipcMain, event, payload) {
   return requestViaRenderer(ipcMain, event, request);
 }
 
-module.exports = {
-  dispatchRequest,
-};
+export { dispatchRequest };

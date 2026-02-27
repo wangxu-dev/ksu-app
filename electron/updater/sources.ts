@@ -1,3 +1,4 @@
+// @ts-nocheck
 const UPDATE_SOURCES = {
   primary: {
     name: "github",
@@ -14,7 +15,4 @@ function resolveReleaseAssetUrl(tag, filename, useFallback = false) {
   return `${source.baseUrl}/releases/download/${tag}/${filename}`;
 }
 
-module.exports = {
-  UPDATE_SOURCES,
-  resolveReleaseAssetUrl,
-};
+export { UPDATE_SOURCES, resolveReleaseAssetUrl };
