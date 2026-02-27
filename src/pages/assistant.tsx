@@ -189,6 +189,8 @@ function AssistantContent() {
       status !== "streaming",
     [prompt, token, activeConversationId, transport, status],
   );
+  const lastMessage = messages[messages.length - 1];
+  const showOptimisticAssistant = status === "submitted" && lastMessage?.role === "user";
 
   async function onNewConversation() {
     const created = await createConversation("新对话");
@@ -310,6 +312,15 @@ function AssistantContent() {
             </div>
           );
         })}
+        {showOptimisticAssistant ? (
+          <div className="flex justify-start">
+            <div className="max-w-[82%]">
+              <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
+                思考中...
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div ref={messagesBottomRef} />
       </div>
 

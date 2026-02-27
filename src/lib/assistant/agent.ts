@@ -67,7 +67,7 @@ export function createAssistantAgent(settings: AssistantSettings, token: string)
         execute: async ({ yearMonth }) => execTool("get_calendar", { token, yearMonth }),
       }),
       get_current_time: tool({
-        description: "获取当前设备时间",
+        description: "获取当前本机时间",
         inputSchema: z.object({}),
         execute: async () => execTool("get_current_time", { token }),
       }),
