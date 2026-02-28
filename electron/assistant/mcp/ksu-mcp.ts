@@ -1,94 +1,116 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+import { z } from "zod";
+import { createLogger } from "../../shared/logger.js";
+import { getCurrentTimePayload } from "../../shared/time.js";
+import type { UnifiedResponsePayload } from "../../request/types.js";
 
-const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
-const { z } = require("zod");
-const { createLogger } = require("../../shared/logger.js");
-const { getCurrentTimePayload } = require("../../shared/time.js");
+type ToolContext = {
+  token?: string;
+};
+
+type KsuEndpointInput = {
+  endpoint: "userInfo" | "personalInfo" | "grades" | "calendarMonth";
+  token: string;
+  yearMonth?: string;
+};
+
+type CallKsuEndpoint = (input: KsuEndpointInput) => Promise<UnifiedResponsePayload>;
+
+type RegisteredTool = {
+  name: string;
+  description: string;
+  schema: z.ZodRawShape;
+  handler: (args: Record<string, unknown>, context: ToolContext) => Promise<unknown>;
+};
+
+type KsuMcpRegistry = {
+  listTools: () => Array<{ name: string; description: string }>;
+  callTool: (
+    name: string,
+    args: Record<string, unknown>,
+    context?: ToolContext,
+  ) => Promise<unknown>;
+};
 
 const logger = createLogger("assistant:mcp");
 
-function parseResponse(response, label) {
+function parseResponse(response: UnifiedResponsePayload, label: string): Record<string, unknown> {
   if (!response.ok) throw new Error(response.error || `${label} failed`);
-  const json = JSON.parse(response.body || "{}");
-  return json;
+  return JSON.parse(response.body || "{}") as Record<string, unknown>;
 }
 
-function requireToken(context) {
+function requireToken(context: ToolContext): string {
   const token = String(context?.token || "").trim();
   if (!token) throw new Error("token is required");
   return token;
 }
 
-function createKsuMcpRegistry({ callKsuEndpoint }) {
-  const server = new McpServer({
-    name: "ksu_mcp",
-    version: "0.1.0",
-  });
+function createKsuMcpRegistry({
+  callKsuEndpoint,
+}: {
+  callKsuEndpoint: CallKsuEndpoint;
+}): KsuMcpRegistry {
+  const tools = new Map<string, RegisteredTool>();
 
-  const tools = new Map();
-  const register = (name, description, schema, handler) => {
-    server.tool(name, description, schema, async (args) => {
-      const output = await handler(args, {});
-      return {
-        content: [{ type: "text", text: JSON.stringify(output) }],
-        structuredContent: output,
-      };
-    });
+  const register = (
+    name: string,
+    description: string,
+    schema: z.ZodRawShape,
+    handler: RegisteredTool["handler"],
+  ): void => {
     tools.set(name, { name, description, schema, handler });
   };
 
-  register("get_user_info", "获取当前登录用户基础信息", z.object({}), async (_args, context) => {
+  register("get_user_info", "获取当前登录用户基础信息", {}, async (_args, context) => {
     const token = requireToken(context);
     const raw = parseResponse(
       await callKsuEndpoint({ endpoint: "userInfo", token }),
       "get_user_info",
     );
-    if (raw.code !== 0 || !raw.data) throw new Error(raw.message || "get_user_info failed");
+    if (raw.code !== 0 || !raw.data) throw new Error(String(raw.message || "get_user_info failed"));
     return raw.data;
   });
 
-  register("get_personal_info", "获取个人概览信息", z.object({}), async (_args, context) => {
+  register("get_personal_info", "获取个人概览信息", {}, async (_args, context) => {
     const token = requireToken(context);
     const raw = parseResponse(
       await callKsuEndpoint({ endpoint: "personalInfo", token }),
       "get_personal_info",
     );
-    if (raw.code !== 0 || !raw.data) throw new Error(raw.message || "get_personal_info failed");
+    if (raw.code !== 0 || !raw.data)
+      throw new Error(String(raw.message || "get_personal_info failed"));
     return raw.data;
   });
 
-  register("get_grades", "获取成绩信息", z.object({}), async (_args, context) => {
+  register("get_grades", "获取成绩信息", {}, async (_args, context) => {
     const token = requireToken(context);
     const raw = parseResponse(await callKsuEndpoint({ endpoint: "grades", token }), "get_grades");
-    if (!raw.success || raw.code !== 200 || !raw.data)
-      throw new Error(raw.msg || "get_grades failed");
+    if (!raw.success || raw.code !== 200 || !raw.data) {
+      throw new Error(String(raw.msg || "get_grades failed"));
+    }
     return raw.data;
   });
 
   register(
     "get_calendar",
     "获取指定月份校历，格式如 2026年02月",
-    z.object({ yearMonth: z.string() }),
+    { yearMonth: z.string() },
     async (args, context) => {
       const token = requireToken(context);
+      const yearMonth = String(args.yearMonth || "");
       const raw = parseResponse(
         await callKsuEndpoint({
           endpoint: "calendarMonth",
           token,
-          yearMonth: args.yearMonth,
+          yearMonth,
         }),
         "get_calendar",
       );
-      if (raw.code !== 0) throw new Error(raw.message || "get_calendar failed");
-      return raw.data || [];
+      if (raw.code !== 0) throw new Error(String(raw.message || "get_calendar failed"));
+      return (raw.data as unknown[]) || [];
     },
   );
 
-  register("get_current_time", "获取当前本机时间", z.object({}), async () =>
-    getCurrentTimePayload(),
-  );
+  register("get_current_time", "获取当前本机时间", {}, async () => getCurrentTimePayload());
 
   return {
     listTools() {
@@ -106,9 +128,9 @@ function createKsuMcpRegistry({ callKsuEndpoint }) {
         name,
         hasToken: Boolean(context && typeof context.token === "string" && context.token.length > 0),
       });
-      const parsed = tool.schema.parse(args || {});
+      const parsed = z.object(tool.schema).parse(args || {});
       try {
-        const output = await tool.handler(parsed, context);
+        const output = await tool.handler(parsed as Record<string, unknown>, context);
         logger.debug("tool call success", { name });
         return output;
       } catch (error) {
@@ -123,3 +145,4 @@ function createKsuMcpRegistry({ callKsuEndpoint }) {
 }
 
 export { createKsuMcpRegistry };
+export type { CallKsuEndpoint, KsuMcpRegistry, ToolContext };

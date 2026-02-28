@@ -1,4 +1,3 @@
-// @ts-nocheck
 const ASSISTANT_STREAM_START_CHANNEL = "assistant:stream:start";
 const ASSISTANT_STREAM_CHUNK_CHANNEL = "assistant:stream:chunk";
 const ASSISTANT_STREAM_DONE_CHANNEL = "assistant:stream:done";

@@ -1,10 +1,41 @@
-// @ts-nocheck
 import { createRequire } from "node:module";
+import type { App } from "electron";
+import type { AppUpdater, ProgressInfo, UpdateInfo } from "electron-updater";
+import { UPDATE_SOURCES } from "./sources.js";
+
 const require = createRequire(import.meta.url);
 
-const { UPDATE_SOURCES } = require("./sources.js");
+type UpdateState = "idle" | "checking" | "downloading" | "downloaded" | "error" | "unsupported";
 
-const DEFAULT_STATUS = {
+type UpdateStatus = {
+  state: UpdateState;
+  message: string;
+  version: string;
+  progress: number;
+  source: string;
+  updatedAt: number;
+};
+
+type LoggerLike = {
+  info: (message: string, meta?: Record<string, unknown>) => void;
+  warn: (message: string, meta?: Record<string, unknown>) => void;
+  error: (message: string, meta?: Record<string, unknown>) => void;
+};
+
+type UpdateManagerDeps = {
+  app: App;
+  logger: LoggerLike;
+  publish: (payload: UpdateStatus) => void;
+};
+
+type UpdateManager = {
+  getStatus: () => UpdateStatus;
+  checkForUpdates: (options?: { silent?: boolean }) => Promise<UpdateStatus>;
+  installDownloaded: () => boolean;
+  startSilentCheck: () => void;
+};
+
+const DEFAULT_STATUS: UpdateStatus = {
   state: "idle",
   message: "",
   version: "",
@@ -13,12 +44,13 @@ const DEFAULT_STATUS = {
   updatedAt: 0,
 };
 
-function createUpdateManager({ app, logger, publish }) {
-  let autoUpdater = null;
+function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): UpdateManager {
+  let autoUpdater: AppUpdater | null = null;
   let updaterAvailable = true;
+
   try {
-    // Optional dependency: when not installed, updater features are gracefully disabled.
-    ({ autoUpdater } = require("electron-updater"));
+    const updaterModule = require("electron-updater") as { autoUpdater: AppUpdater };
+    autoUpdater = updaterModule.autoUpdater;
   } catch (error) {
     updaterAvailable = false;
     logger.warn("electron-updater is not installed; update feature disabled", {
@@ -26,12 +58,12 @@ function createUpdateManager({ app, logger, publish }) {
     });
   }
 
-  let status = { ...DEFAULT_STATUS };
+  let status: UpdateStatus = { ...DEFAULT_STATUS };
   let checking = false;
   let initialized = false;
   let usingFallback = false;
 
-  function emit(next) {
+  function emit(next: Partial<UpdateStatus>): void {
     status = {
       ...status,
       ...next,
@@ -40,7 +72,7 @@ function createUpdateManager({ app, logger, publish }) {
     publish(status);
   }
 
-  function setSource(useFallback) {
+  function setSource(useFallback: boolean): void {
     if (!autoUpdater) return;
     const source = useFallback ? UPDATE_SOURCES.fallback : UPDATE_SOURCES.primary;
     const url = `${source.baseUrl}/releases/latest/download`;
@@ -52,7 +84,7 @@ function createUpdateManager({ app, logger, publish }) {
     logger.info("updater source selected", { source: source.name, url });
   }
 
-  function ensureInitialized() {
+  function ensureInitialized(): void {
     if (!updaterAvailable || !autoUpdater) return;
     if (initialized) return;
     initialized = true;
@@ -70,20 +102,20 @@ function createUpdateManager({ app, logger, publish }) {
       });
     });
 
-    autoUpdater.on("update-available", (info) => {
+    autoUpdater.on("update-available", (info: UpdateInfo) => {
       emit({
         state: "downloading",
         message: "发现新版本，正在后台下载...",
-        version: String(info?.version || ""),
+        version: String(info.version || ""),
         progress: 0,
       });
     });
 
-    autoUpdater.on("download-progress", (progressObj) => {
+    autoUpdater.on("download-progress", (progressObj: ProgressInfo) => {
       emit({
         state: "downloading",
         message: "更新下载中...",
-        progress: Math.max(0, Math.min(100, Math.round(Number(progressObj?.percent || 0)))),
+        progress: Math.max(0, Math.min(100, Math.round(Number(progressObj.percent || 0)))),
       });
     });
 
@@ -95,16 +127,16 @@ function createUpdateManager({ app, logger, publish }) {
       });
     });
 
-    autoUpdater.on("update-downloaded", (info) => {
+    autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
       emit({
         state: "downloaded",
         message: "新版本已下载，点击重启更新",
-        version: String(info?.version || ""),
+        version: String(info.version || ""),
         progress: 100,
       });
     });
 
-    autoUpdater.on("error", (error) => {
+    autoUpdater.on("error", (error: Error) => {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("auto updater error", { message });
       emit({
@@ -114,7 +146,9 @@ function createUpdateManager({ app, logger, publish }) {
     });
   }
 
-  async function checkForUpdates({ silent = false } = {}) {
+  async function checkForUpdates({
+    silent = false,
+  }: { silent?: boolean } = {}): Promise<UpdateStatus> {
     if (!updaterAvailable || !autoUpdater) {
       emit({
         state: "unsupported",
@@ -167,20 +201,20 @@ function createUpdateManager({ app, logger, publish }) {
     return status;
   }
 
-  function getStatus() {
+  function getStatus(): UpdateStatus {
     return status;
   }
 
-  function installDownloaded() {
+  function installDownloaded(): boolean {
     if (!updaterAvailable || !autoUpdater) return false;
     if (status.state !== "downloaded") return false;
     setImmediate(() => {
-      autoUpdater.quitAndInstall();
+      autoUpdater?.quitAndInstall();
     });
     return true;
   }
 
-  function startSilentCheck() {
+  function startSilentCheck(): void {
     if (!updaterAvailable || !autoUpdater) {
       emit({
         state: "unsupported",

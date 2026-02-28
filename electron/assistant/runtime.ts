@@ -1,31 +1,48 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
-const { randomUUID } = require("node:crypto");
-const { buildKsuMcpTools } = require("./ksu-mcp.js");
-const {
+import { randomUUID } from "node:crypto";
+import { buildKsuMcpTools, type CallKsuEndpoint } from "./ksu-mcp.js";
+import {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
   ASSISTANT_STREAM_ERROR_CHANNEL,
-} = require("./channels.js");
+} from "./channels.js";
+import type { IpcMainInvokeEvent } from "electron";
+import type { AssistantStore } from "./store.js";
 
-function emitChunk(event, streamId, delta) {
+type AssistantRunPayload = {
+  message?: string;
+  token?: string;
+  conversationId?: string;
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+};
+
+type OpenAIConfig = {
+  apiKey: string;
+  model: string;
+  baseURL: string;
+};
+
+type StreamResult = {
+  streamId: string;
+};
+
+function emitChunk(event: IpcMainInvokeEvent, streamId: string, delta: string): void {
   event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta });
 }
 
-function emitDone(event, streamId) {
+function emitDone(event: IpcMainInvokeEvent, streamId: string): void {
   event.sender.send(ASSISTANT_STREAM_DONE_CHANNEL, { streamId });
 }
 
-function emitError(event, streamId, error) {
+function emitError(event: IpcMainInvokeEvent, streamId: string, error: unknown): void {
   event.sender.send(ASSISTANT_STREAM_ERROR_CHANNEL, {
     streamId,
     error: error instanceof Error ? error.message : "assistant failed",
   });
 }
 
-function currentDateText() {
+function currentDateText(): string {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -33,7 +50,7 @@ function currentDateText() {
   return `${y}年${m}月${d}日`;
 }
 
-function buildSystemPrompt() {
+function buildSystemPrompt(): string {
   return [
     "你是 Ksu-App 内置助手。",
     "你只能通过 ksu_mcp 工具访问学校数据。",
@@ -43,7 +60,10 @@ function buildSystemPrompt() {
   ].join("\n");
 }
 
-function resolveOpenAIConfig(payload, settings) {
+function resolveOpenAIConfig(
+  payload: AssistantRunPayload,
+  settings: ReturnType<AssistantStore["getSettings"]>,
+): OpenAIConfig {
   const apiKey = payload?.apiKey || settings?.apiKey || process.env.OPENAI_API_KEY || "";
   const model =
     payload?.model || settings?.model || process.env.OPENAI_MODEL || "openai/gpt-4o-mini";
@@ -56,7 +76,17 @@ function resolveOpenAIConfig(payload, settings) {
   return { apiKey, model, baseURL };
 }
 
-async function runAssistantStream({ event, payload, callKsuEndpoint, store }) {
+async function runAssistantStream({
+  event,
+  payload,
+  callKsuEndpoint,
+  store,
+}: {
+  event: IpcMainInvokeEvent;
+  payload: AssistantRunPayload;
+  callKsuEndpoint: CallKsuEndpoint;
+  store: AssistantStore;
+}): Promise<StreamResult> {
   const streamId = randomUUID();
   const message = String(payload?.message || "").trim();
   const token = String(payload?.token || "").trim();
@@ -122,7 +152,8 @@ async function runAssistantStream({ event, payload, callKsuEndpoint, store }) {
             inputSchema: z.object({
               yearMonth: z.string(),
             }),
-            execute: async ({ yearMonth }) => ksu.get_calendar({ yearMonth }),
+            execute: async ({ yearMonth }: { yearMonth: string }) =>
+              ksu.get_calendar({ yearMonth }),
           }),
           get_current_time: tool({
             description: "获取当前本机时间",

@@ -1,29 +1,31 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
-const { sessionFetch } = require("./session-fetch.js");
-const { createLogger } = require("../shared/logger.js");
+import type { Session } from "electron";
+import { sessionFetch } from "./session-fetch.js";
+import { createLogger } from "../shared/logger.js";
+import type { UnifiedRequestPayload, UnifiedResponsePayload } from "./types.js";
 
 const logger = createLogger("request:main");
 const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
 
-function shouldRetryError(error) {
+function shouldRetryError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || "");
   return (
     message.includes("aborted") || message.includes("Timeout") || message.includes("timed out")
   );
 }
 
-function shouldRetryResponse(method, status) {
+function shouldRetryResponse(method: string, status: number): boolean {
   return method === "GET" && RETRYABLE_STATUS.has(status);
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function executeOnce(electronSession, payload, timeoutMs) {
+async function executeOnce(
+  electronSession: Session,
+  payload: UnifiedRequestPayload,
+  timeoutMs: number,
+): Promise<UnifiedResponsePayload> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -37,7 +39,7 @@ async function executeOnce(electronSession, payload, timeoutMs) {
       timeoutMs,
     });
 
-    const headers = {};
+    const headers: Record<string, string> = {};
     response.headers.forEach((value, key) => {
       headers[key] = value;
     });
@@ -53,7 +55,10 @@ async function executeOnce(electronSession, payload, timeoutMs) {
   }
 }
 
-async function requestViaMain(electronSession, payload) {
+async function requestViaMain(
+  electronSession: Session,
+  payload: UnifiedRequestPayload,
+): Promise<UnifiedResponsePayload> {
   const timeoutMs = payload.timeoutMs ?? 30_000;
   const method = String(payload.method || "GET").toUpperCase();
   const retryCount = Math.max(0, Number(payload.retryCount || 0));
