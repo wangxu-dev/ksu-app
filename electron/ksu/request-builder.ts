@@ -1,11 +1,20 @@
-// @ts-nocheck
+import type { UnifiedRequestPayload } from "../request/types.js";
+
 const USER_INFO_URL = "https://authx-service.ksu.edu.cn/personal/api/v1/personal/me/user";
 const PERSONAL_INFO_URL =
   "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo";
 const GRADES_URL = "https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1";
 const CALENDAR_URL = "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getXlInfo";
 
-function baseHeaders(token) {
+type KsuEndpoint = "userInfo" | "personalInfo" | "grades" | "calendarMonth";
+
+type KsuRequestPayload = {
+  endpoint: KsuEndpoint;
+  token: string;
+  yearMonth?: string;
+};
+
+function baseHeaders(token: string): Record<string, string> {
   return {
     accept: "application/json, text/plain, */*",
     "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
@@ -16,7 +25,7 @@ function baseHeaders(token) {
   };
 }
 
-function buildKsuRequest(payload) {
+function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
   const endpoint = payload?.endpoint;
   const token = payload?.token;
   if (!endpoint || !token) {
@@ -86,3 +95,4 @@ function buildKsuRequest(payload) {
 }
 
 export { buildKsuRequest };
+export type { KsuRequestPayload };

@@ -1,33 +1,27 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const { fileURLToPath } = require("node:url");
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = require("node:path").dirname(__filename);
-
-const { app, BrowserWindow, Menu, ipcMain } = require("electron");
-const path = require("node:path");
-const fs = require("node:fs");
-const { createLogger } = require("./shared/logger.js");
-const { login } = require("./auth/login.js");
-const { buildKsuRequest } = require("./ksu/request-builder.js");
-const { dispatchRequest } = require("./request/dispatcher.js");
-const { runAssistantStream } = require("./assistant/runtime.js");
-const { createAssistantStore } = require("./assistant/store.js");
-const { createKsuMcpRegistry } = require("./assistant/mcp/ksu-mcp.js");
-const { createUpdateManager } = require("./updater/manager.js");
-const {
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, Menu, ipcMain, type MenuItemConstructorOptions } from "electron";
+import { createLogger } from "./shared/logger.js";
+import { login } from "./auth/login.js";
+import { buildKsuRequest, type KsuRequestPayload } from "./ksu/request-builder.js";
+import { dispatchRequest } from "./request/dispatcher.js";
+import { runAssistantStream } from "./assistant/runtime.js";
+import { createAssistantStore } from "./assistant/store.js";
+import { createKsuMcpRegistry } from "./assistant/mcp/ksu-mcp.js";
+import { createUpdateManager } from "./updater/manager.js";
+import {
   APP_UPDATE_STATUS_CHANNEL,
   APP_UPDATE_GET_STATUS_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
-} = require("./updater/channels.js");
-const {
+} from "./updater/channels.js";
+import {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
   PROXY_REQUEST_CHANNEL,
-} = require("./request/channels.js");
-const {
+} from "./request/channels.js";
+import {
   ASSISTANT_STREAM_START_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
@@ -37,11 +31,14 @@ const {
   ASSISTANT_SETTINGS_SET_CHANNEL,
   ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
   ASSISTANT_MCP_CALL_TOOL_CHANNEL,
-} = require("./assistant/channels.js");
+} from "./assistant/channels.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const logger = createLogger("main");
 
-function resolveIconPath() {
+function resolveIconPath(): string {
   const icoPath = path.join(__dirname, "..", "build", "icons", "icon.ico");
   const pngPath = path.join(__dirname, "..", "build", "icons", "icon.png");
   const icnsPath = path.join(__dirname, "..", "build", "icons", "icon.icns");
@@ -51,7 +48,7 @@ function resolveIconPath() {
   return pngPath;
 }
 
-function platformWindowOptions() {
+function platformWindowOptions(): Partial<Electron.BrowserWindowConstructorOptions> {
   if (process.platform === "darwin") {
     return {
       titleBarStyle: "default",
@@ -65,17 +62,15 @@ function platformWindowOptions() {
   };
 }
 
-function buildApplicationMenu() {
+function buildApplicationMenu(): Electron.Menu | null {
   if (process.platform === "darwin") {
-    // Keep native mac app/window behavior but remove File/Edit style menus.
-    return Menu.buildFromTemplate([{ role: "appMenu" }, { role: "windowMenu" }]);
+    const template: MenuItemConstructorOptions[] = [{ role: "appMenu" }, { role: "windowMenu" }];
+    return Menu.buildFromTemplate(template);
   }
-
-  // On Windows/Linux we don't need a classic menu bar.
   return null;
 }
 
-function createWindow() {
+function createWindow(): void {
   const width = 1200;
   const height = 800;
   const iconPath = resolveIconPath();
@@ -95,7 +90,7 @@ function createWindow() {
     minHeight: height,
     resizable: true,
     maximizable: true,
-    fullScreenable: true,
+    fullscreenable: true,
     icon: hasWindowIcon ? windowIcon : undefined,
     ...platformWindowOptions(),
     webPreferences: {
@@ -142,14 +137,14 @@ function createWindow() {
     });
   });
   win.webContents.on("render-process-gone", (_event, details) => {
-    logger.error("renderer process gone", details || {});
+    logger.error("renderer process gone", details ? { ...details } : {});
   });
   bindClipboardShortcuts(win);
   bindDevtoolsShortcuts(win);
   bindInspectContextMenu(win);
 }
 
-function bindClipboardShortcuts(win) {
+function bindClipboardShortcuts(win: BrowserWindow): void {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     const hasModifier = !!input.meta || !!input.control;
@@ -178,7 +173,7 @@ function bindClipboardShortcuts(win) {
   });
 }
 
-function bindDevtoolsShortcuts(win) {
+function bindDevtoolsShortcuts(win: BrowserWindow): void {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     const key = String(input.key || "").toLowerCase();
@@ -197,7 +192,7 @@ function bindDevtoolsShortcuts(win) {
   });
 }
 
-function bindInspectContextMenu(win) {
+function bindInspectContextMenu(win: BrowserWindow): void {
   win.webContents.on("context-menu", (_event, params) => {
     const menu = Menu.buildFromTemplate([
       {
@@ -217,7 +212,9 @@ function bindInspectContextMenu(win) {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
   logger.info("app ready");
-  const broadcastUpdateStatus = (payload) => {
+  const broadcastUpdateStatus = (
+    payload: ReturnType<ReturnType<typeof createUpdateManager>["getStatus"]>,
+  ) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send(APP_UPDATE_STATUS_CHANNEL, payload);
@@ -238,10 +235,13 @@ app.whenReady().then(() => {
     }
   }
   const assistantStore = createAssistantStore(app.getPath("userData"));
-  ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload) => {
+  ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload: unknown) => {
     try {
       logger.info("auth login request received");
-      const result = await login(event.sender.session, payload || {});
+      const result = await login(
+        event.sender.session,
+        (payload || {}) as { username: string; password: string },
+      );
       logger.info("auth login request completed", { success: !!result?.success });
       return result;
     } catch (error) {
@@ -251,9 +251,9 @@ app.whenReady().then(() => {
       throw error;
     }
   });
-  ipcMain.handle(KSU_REQUEST_CHANNEL, async (event, payload) => {
+  ipcMain.handle(KSU_REQUEST_CHANNEL, async (event, payload: unknown) => {
     try {
-      return await dispatchRequest(ipcMain, event, buildKsuRequest(payload));
+      return await dispatchRequest(ipcMain, event, buildKsuRequest(payload as KsuRequestPayload));
     } catch (error) {
       logger.error("ksu request failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -267,7 +267,7 @@ app.whenReady().then(() => {
       };
     }
   });
-  ipcMain.handle(PROXY_REQUEST_CHANNEL, async (event, payload) =>
+  ipcMain.handle(PROXY_REQUEST_CHANNEL, async (event, payload: unknown) =>
     dispatchRequest(ipcMain, event, payload),
   );
   ipcMain.handle(APP_UPDATE_GET_STATUS_CHANNEL, async () => updateManager.getStatus());
@@ -275,35 +275,51 @@ app.whenReady().then(() => {
   ipcMain.handle(APP_UPDATE_INSTALL_CHANNEL, async () => ({
     ok: updateManager.installDownloaded(),
   }));
-  ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload) =>
+  ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload: unknown) =>
     runAssistantStream({
       event,
-      payload,
+      payload: (payload || {}) as {
+        message?: string;
+        token?: string;
+        conversationId?: string;
+        apiKey?: string;
+        model?: string;
+        baseUrl?: string;
+      },
       store: assistantStore,
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     }),
   );
-  ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload) =>
-    assistantStore.createConversation(payload?.title),
+  ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload: unknown) =>
+    assistantStore.createConversation((payload as { title?: string } | undefined)?.title),
   );
   ipcMain.handle(ASSISTANT_CONVERSATION_LIST_CHANNEL, async () =>
     assistantStore.listConversations(),
   );
-  ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload) =>
-    assistantStore.getMessages(String(payload?.conversationId || "")),
+  ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload: unknown) =>
+    assistantStore.getMessages(
+      String((payload as { conversationId?: string } | undefined)?.conversationId || ""),
+    ),
   );
-  ipcMain.handle(ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL, async (_event, payload) => {
-    const conversationId = String(payload?.conversationId || "");
-    logger.debug("replace conversation messages", {
-      conversationId,
-      count: Array.isArray(payload?.messages) ? payload.messages.length : 0,
-    });
-    assistantStore.replaceMessages(conversationId, payload?.messages || []);
-    return { ok: true };
-  });
+  ipcMain.handle(
+    ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
+    async (_event, payload: unknown) => {
+      const safePayload = (payload || {}) as {
+        conversationId?: string;
+        messages?: Array<{ role: "user" | "assistant"; content: string }>;
+      };
+      const conversationId = String(safePayload.conversationId || "");
+      logger.debug("replace conversation messages", {
+        conversationId,
+        count: Array.isArray(safePayload.messages) ? safePayload.messages.length : 0,
+      });
+      assistantStore.replaceMessages(conversationId, safePayload.messages || []);
+      return { ok: true };
+    },
+  );
   ipcMain.handle(ASSISTANT_SETTINGS_GET_CHANNEL, async () => assistantStore.getSettings());
-  ipcMain.handle(ASSISTANT_SETTINGS_SET_CHANNEL, async (_event, payload) =>
-    assistantStore.setSettings(payload || {}),
+  ipcMain.handle(ASSISTANT_SETTINGS_SET_CHANNEL, async (_event, payload: unknown) =>
+    assistantStore.setSettings((payload || {}) as Record<string, string>),
   );
   ipcMain.handle(ASSISTANT_MCP_LIST_TOOLS_CHANNEL, async (event) => {
     const registry = createKsuMcpRegistry({
@@ -312,14 +328,19 @@ app.whenReady().then(() => {
     logger.debug("mcp list tools");
     return registry.listTools();
   });
-  ipcMain.handle(ASSISTANT_MCP_CALL_TOOL_CHANNEL, async (event, payload) => {
+  ipcMain.handle(ASSISTANT_MCP_CALL_TOOL_CHANNEL, async (event, payload: unknown) => {
     const registry = createKsuMcpRegistry({
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
-    const toolName = String(payload?.name || "");
-    const token = String(payload?.token || "");
+    const safePayload = (payload || {}) as {
+      name?: string;
+      token?: string;
+      args?: Record<string, unknown>;
+    };
+    const toolName = String(safePayload.name || "");
+    const token = String(safePayload.token || "");
     try {
-      return await registry.callTool(toolName, payload?.args || {}, { token });
+      return await registry.callTool(toolName, safePayload.args || {}, { token });
     } catch (error) {
       logger.error("mcp call failed", {
         toolName,

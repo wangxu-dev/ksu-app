@@ -1,4 +1,3 @@
-// @ts-nocheck
 const AUTH_LOGIN_CHANNEL = "auth:login";
 const KSU_REQUEST_CHANNEL = "ksu:request";
 const PROXY_REQUEST_CHANNEL = "proxy:request";

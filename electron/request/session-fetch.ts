@@ -1,19 +1,19 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
-// @ts-nocheck
-const { createLogger } = require("../shared/logger.js");
+import type { Session } from "electron";
+import { createLogger } from "../shared/logger.js";
 
 const logger = createLogger("request:session");
 const DEFAULT_TIMEOUT_MS = 15000;
 
-function shouldFallbackToNode(error) {
+type SessionFetchInit = RequestInit & {
+  timeoutMs?: number;
+};
+
+function shouldFallbackToNode(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || "");
   return message.includes("ERR_BLOCKED_BY_CLIENT") || message.includes("Redirect was cancelled");
 }
 
-function resolveSignal(init, timeoutMs) {
+function resolveSignal(init: SessionFetchInit, timeoutMs: number): AbortSignal | null | undefined {
   if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
     return init?.signal;
   }
@@ -21,7 +21,11 @@ function resolveSignal(init, timeoutMs) {
   return AbortSignal.timeout(timeoutMs);
 }
 
-async function sessionFetch(electronSession, url, init = {}) {
+async function sessionFetch(
+  electronSession: Session,
+  url: string,
+  init: SessionFetchInit = {},
+): Promise<Response> {
   const timeoutMs = Number(init.timeoutMs || DEFAULT_TIMEOUT_MS);
   const mergedInit = {
     ...init,

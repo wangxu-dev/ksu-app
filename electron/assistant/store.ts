@@ -1,25 +1,71 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
+import { createLogger } from "../shared/logger.js";
 
-const fs = require("node:fs");
-const path = require("node:path");
-const { randomUUID } = require("node:crypto");
-const { DatabaseSync } = require("node:sqlite");
-const { createLogger } = require("../shared/logger.js");
+type AssistantRole = "user" | "assistant";
 
-const DEFAULT_SETTINGS = {
+type ConversationRecord = {
+  id: string;
+  title: string;
+  created_at: number;
+  updated_at: number;
+};
+
+type ConversationListRow = ConversationRecord & {
+  last_message: string | null;
+};
+
+type ConversationListItem = ConversationRecord & {
+  preview: string;
+};
+
+type MessageRecord = {
+  id: string;
+  conversation_id: string;
+  role: AssistantRole;
+  content: string;
+  created_at: number;
+};
+
+type AssistantSettings = {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  systemPrompt: string;
+};
+
+type SettingsPatch = Partial<Record<keyof AssistantSettings, string>>;
+
+type ReplaceMessageItem = {
+  role: AssistantRole;
+  content: string;
+};
+
+type AssistantStore = {
+  getSettings: () => AssistantSettings;
+  setSettings: (patch: SettingsPatch) => AssistantSettings;
+  createConversation: (title?: string) => ConversationRecord | undefined;
+  listConversations: () => ConversationListItem[];
+  getMessages: (conversationId: string) => MessageRecord[];
+  addMessage: (conversationId: string, role: AssistantRole, content: string) => string;
+  updateMessage: (id: string, content: string) => void;
+  replaceMessages: (conversationId: string, messages: ReplaceMessageItem[]) => void;
+};
+
+const DEFAULT_SETTINGS: AssistantSettings = {
   baseUrl: "https://openrouter.ai/api/v1",
   model: "openai/gpt-4o-mini",
   apiKey: "",
   systemPrompt: "",
 };
 
-function now() {
+function now(): number {
   return Date.now();
 }
 
-function createAssistantStore(userDataDir) {
+function createAssistantStore(userDataDir: string): AssistantStore {
   const logger = createLogger("assistant:store");
   const dir = path.join(userDataDir, "assistant");
   fs.mkdirSync(dir, { recursive: true });
@@ -86,10 +132,10 @@ function createAssistantStore(userDataDir) {
   `);
   const getSettingStmt = db.prepare("SELECT value FROM settings WHERE key = ?");
 
-  function getSettings() {
-    const out = { ...DEFAULT_SETTINGS };
-    for (const key of Object.keys(DEFAULT_SETTINGS)) {
-      const row = getSettingStmt.get(key);
+  function getSettings(): AssistantSettings {
+    const out: AssistantSettings = { ...DEFAULT_SETTINGS };
+    for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof AssistantSettings)[]) {
+      const row = getSettingStmt.get(key) as { value?: string } | undefined;
       if (row && typeof row.value === "string") {
         out[key] = row.value;
       }
@@ -97,7 +143,7 @@ function createAssistantStore(userDataDir) {
     return out;
   }
 
-  function setSettings(patch) {
+  function setSettings(patch: SettingsPatch): AssistantSettings {
     for (const [key, value] of Object.entries(patch || {})) {
       if (!(key in DEFAULT_SETTINGS)) continue;
       setSettingStmt.run(key, String(value ?? ""));
@@ -105,26 +151,30 @@ function createAssistantStore(userDataDir) {
     return getSettings();
   }
 
-  function createConversation(title) {
+  function createConversation(title?: string): ConversationRecord | undefined {
     const id = randomUUID();
     const ts = now();
     const safeTitle = String(title || "新对话").slice(0, 60);
     createConversationStmt.run(id, safeTitle, ts, ts);
-    return getConversationStmt.get(id);
+    return getConversationStmt.get(id) as ConversationRecord | undefined;
   }
 
-  function listConversations() {
-    return listConversationsStmt.all().map((row) => ({
-      ...row,
+  function listConversations(): ConversationListItem[] {
+    const rows = listConversationsStmt.all() as ConversationListRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
       preview: row.last_message ? String(row.last_message).slice(0, 50) : "",
     }));
   }
 
-  function getMessages(conversationId) {
-    return listMessagesStmt.all(conversationId);
+  function getMessages(conversationId: string): MessageRecord[] {
+    return listMessagesStmt.all(conversationId) as MessageRecord[];
   }
 
-  function addMessage(conversationId, role, content) {
+  function addMessage(conversationId: string, role: AssistantRole, content: string): string {
     const id = randomUUID();
     const ts = now();
     addMessageStmt.run(id, conversationId, role, content, ts);
@@ -132,11 +182,11 @@ function createAssistantStore(userDataDir) {
     return id;
   }
 
-  function updateMessage(id, content) {
+  function updateMessage(id: string, content: string): void {
     updateMessageStmt.run(String(content || ""), id);
   }
 
-  function replaceMessages(conversationId, messages) {
+  function replaceMessages(conversationId: string, messages: ReplaceMessageItem[]): void {
     const ts = now();
     const rows = Array.isArray(messages) ? messages : [];
     logger.debug("replace messages begin", { conversationId, count: rows.length });
@@ -175,3 +225,12 @@ function createAssistantStore(userDataDir) {
 }
 
 export { createAssistantStore };
+export type {
+  AssistantRole,
+  AssistantSettings,
+  AssistantStore,
+  ConversationListItem,
+  ConversationRecord,
+  MessageRecord,
+  ReplaceMessageItem,
+};

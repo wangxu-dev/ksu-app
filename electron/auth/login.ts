@@ -1,25 +1,50 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
+import type { Session } from "electron";
+import { sessionFetch } from "../request/session-fetch.js";
+import { createLogger } from "../shared/logger.js";
 
 const LOGIN_URL =
   "https://cas.ksu.edu.cn/cas/login?service=https%3A%2F%2Fportal.ksu.edu.cn%2F%3Fpath%3Dhttps%253A%252F%252Fportal.ksu.edu.cn%252Fmain.html%2523%252F";
-const { sessionFetch } = require("../request/session-fetch.js");
-const { createLogger } = require("../shared/logger.js");
 
 const logger = createLogger("auth:login");
 const LOGIN_PAGE_RETRY_LIMIT = 2;
 
-function shouldRetryStatus(status) {
+type LoginPayload = {
+  username: string;
+  password: string;
+};
+
+type LoginResult =
+  | { success: true; token: string; message: string }
+  | { success: false; message: string };
+
+function shouldRetryStatus(status: number): boolean {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseHiddenFields(html) {
-  const fields = {
+type HiddenFields = {
+  execution: string;
+  currentMenu: string;
+  failN: string;
+  geolocation: string;
+  fpVisitorId: string;
+};
+
+function isHiddenFieldName(name: string): name is keyof HiddenFields {
+  return (
+    name === "execution" ||
+    name === "currentMenu" ||
+    name === "failN" ||
+    name === "geolocation" ||
+    name === "fpVisitorId"
+  );
+}
+
+function parseHiddenFields(html: string): HiddenFields {
+  const fields: HiddenFields = {
     execution: "",
     currentMenu: "1",
     failN: "0",
@@ -32,8 +57,8 @@ function parseHiddenFields(html) {
   const inputs = html.match(inputRegex) || [];
 
   for (const tag of inputs) {
-    const attrs = {};
-    let match;
+    const attrs: Record<string, string> = {};
+    let match: RegExpExecArray | null;
     while ((match = attrRegex.exec(tag)) !== null) {
       const key = String(match[1]).toLowerCase();
       attrs[key] = match[2] ?? match[3] ?? "";
@@ -42,13 +67,13 @@ function parseHiddenFields(html) {
 
     if ((attrs.type || "").toLowerCase() !== "hidden") continue;
     if (!attrs.name) continue;
-    if (attrs.name in fields) fields[attrs.name] = attrs.value || "";
+    if (isHiddenFieldName(attrs.name)) fields[attrs.name] = attrs.value || "";
   }
 
   return fields;
 }
 
-function extractIdTokenFromLocation(location) {
+function extractIdTokenFromLocation(location: string): string {
   const decoded = decodeURIComponent(location);
   const ticketMatch = decoded.match(/ticket=([^&]+)/);
   if (!ticketMatch) throw new Error("无法提取 ticket");
@@ -58,12 +83,17 @@ function extractIdTokenFromLocation(location) {
   const payload = parts[1];
   const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-  const payloadJson = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  const payloadJson = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as {
+    idToken?: string;
+  };
   if (!payloadJson.idToken) throw new Error("无法获取 idToken");
   return payloadJson.idToken;
 }
 
-async function login(electronSession, { username, password }) {
+async function login(
+  electronSession: Session,
+  { username, password }: LoginPayload,
+): Promise<LoginResult> {
   const userTag = String(username || "").trim();
   logger.info("login started", {
     username: userTag ? `${userTag.slice(0, 3)}***` : "",

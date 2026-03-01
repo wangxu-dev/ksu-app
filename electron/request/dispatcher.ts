@@ -1,37 +1,40 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
-const { requestViaMain } = require("./main-requester.js");
-const { requestViaRenderer } = require("./renderer-requester.js");
-const { createLogger } = require("../shared/logger.js");
+import type { IpcMain, IpcMainInvokeEvent } from "electron";
+import { requestViaMain } from "./main-requester.js";
+import { requestViaRenderer } from "./renderer-requester.js";
+import { createLogger } from "../shared/logger.js";
+import type { UnifiedRequestPayload, UnifiedResponsePayload } from "./types.js";
 
 const logger = createLogger("request:dispatcher");
 
-function normalizePayload(payload) {
+function normalizePayload(payload: unknown): UnifiedRequestPayload {
   if (!payload || typeof payload !== "object") {
     throw new Error("invalid request payload");
   }
 
-  const method = String(payload.method || "GET").toUpperCase();
-  const url = String(payload.url || "");
-  const mode = payload.mode === "main" ? "main" : "renderer";
+  const raw = payload as Partial<UnifiedRequestPayload>;
+  const method = String(raw.method || "GET").toUpperCase();
+  const url = String(raw.url || "");
+  const mode = raw.mode === "main" ? "main" : "renderer";
   if (!url) throw new Error("url is required");
 
   return {
     mode,
     method,
     url,
-    headers: payload.headers || {},
-    body: payload.body,
-    timeoutMs: payload.timeoutMs,
-    followRedirects: payload.followRedirects,
-    retryCount: Number(payload.retryCount || 0),
-    retryDelayMs: Number(payload.retryDelayMs || 350),
+    headers: raw.headers || {},
+    body: raw.body,
+    timeoutMs: raw.timeoutMs,
+    followRedirects: raw.followRedirects,
+    retryCount: Number(raw.retryCount || 0),
+    retryDelayMs: Number(raw.retryDelayMs || 350),
   };
 }
 
-async function dispatchRequest(ipcMain, event, payload) {
+async function dispatchRequest(
+  ipcMain: IpcMain,
+  event: IpcMainInvokeEvent,
+  payload: unknown,
+): Promise<UnifiedResponsePayload> {
   let request;
   try {
     request = normalizePayload(payload);

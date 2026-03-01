@@ -1,4 +1,3 @@
-// @ts-nocheck
 const APP_UPDATE_STATUS_CHANNEL = "app:update:status";
 const APP_UPDATE_GET_STATUS_CHANNEL = "app:update:get-status";
 const APP_UPDATE_CHECK_CHANNEL = "app:update:check";

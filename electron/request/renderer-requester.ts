@@ -1,15 +1,21 @@
-// @ts-nocheck
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-
-const { BrowserWindow } = require("electron");
-const { randomUUID } = require("node:crypto");
-const { REQUESTER_RESULT_CHANNEL, REQUESTER_TASK_CHANNEL } = require("./channels.js");
-const { createLogger } = require("../shared/logger.js");
+import { randomUUID } from "node:crypto";
+import { BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
+import { REQUESTER_RESULT_CHANNEL, REQUESTER_TASK_CHANNEL } from "./channels.js";
+import { createLogger } from "../shared/logger.js";
+import type {
+  RendererRequestResult,
+  RendererRequestTask,
+  UnifiedRequestPayload,
+  UnifiedResponsePayload,
+} from "./types.js";
 
 const logger = createLogger("request:renderer");
 
-function requestViaRenderer(ipcMain, event, payload) {
+function requestViaRenderer(
+  ipcMain: IpcMain,
+  event: IpcMainInvokeEvent,
+  payload: UnifiedRequestPayload,
+): Promise<UnifiedResponsePayload> {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window || window.isDestroyed()) {
     logger.error("renderer window unavailable");
@@ -31,15 +37,18 @@ function requestViaRenderer(ipcMain, event, payload) {
     timeoutMs,
   });
 
-  return new Promise((resolve) => {
+  return new Promise((resolve: (value: UnifiedResponsePayload) => void) => {
     let done = false;
 
-    const cleanup = (handler, timer) => {
+    const cleanup = (
+      handler: (_evt: unknown, result: RendererRequestResult) => void,
+      timer: NodeJS.Timeout,
+    ) => {
       ipcMain.removeListener(REQUESTER_RESULT_CHANNEL, handler);
       clearTimeout(timer);
     };
 
-    const handler = (_evt, result) => {
+    const handler = (_evt: unknown, result: RendererRequestResult) => {
       if (!result || result.requestId !== requestId) return;
       done = true;
       cleanup(handler, timer);
@@ -76,10 +85,11 @@ function requestViaRenderer(ipcMain, event, payload) {
     }, timeoutMs + 1_000);
 
     ipcMain.on(REQUESTER_RESULT_CHANNEL, handler);
-    window.webContents.send(REQUESTER_TASK_CHANNEL, {
+    const task: RendererRequestTask = {
       ...payload,
       requestId,
-    });
+    };
+    window.webContents.send(REQUESTER_TASK_CHANNEL, task);
   });
 }
 

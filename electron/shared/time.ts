@@ -1,5 +1,11 @@
-// @ts-nocheck
-function getCurrentTimePayload() {
+type CurrentTimePayload = {
+  datetime: string;
+  weekday: string;
+  timezone: string;
+  text: string;
+};
+
+function getCurrentTimePayload(): CurrentTimePayload {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
