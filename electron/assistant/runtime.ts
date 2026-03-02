@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { buildKsuMcpTools, type CallKsuEndpoint } from "./ksu-mcp.js";
+import { createLogger } from "../shared/logger.js";
 import {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
@@ -27,15 +28,23 @@ type StreamResult = {
   streamId: string;
 };
 
+const logger = createLogger("assistant:runtime");
+
 function emitChunk(event: IpcMainInvokeEvent, streamId: string, delta: string): void {
+  logger.debug("stream chunk", { streamId, chunkLength: delta.length });
   event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta });
 }
 
 function emitDone(event: IpcMainInvokeEvent, streamId: string): void {
+  logger.info("stream done", { streamId });
   event.sender.send(ASSISTANT_STREAM_DONE_CHANNEL, { streamId });
 }
 
 function emitError(event: IpcMainInvokeEvent, streamId: string, error: unknown): void {
+  logger.error("stream error", {
+    streamId,
+    error: error instanceof Error ? error.message : String(error),
+  });
   event.sender.send(ASSISTANT_STREAM_ERROR_CHANNEL, {
     streamId,
     error: error instanceof Error ? error.message : "assistant failed",
@@ -93,14 +102,17 @@ async function runAssistantStream({
   const conversationId = String(payload?.conversationId || "");
 
   if (!message) {
+    logger.warn("stream invalid payload", { streamId, reason: "message is required" });
     emitError(event, streamId, new Error("message is required"));
     return { streamId };
   }
   if (!token) {
+    logger.warn("stream invalid payload", { streamId, reason: "token is required" });
     emitError(event, streamId, new Error("token is required"));
     return { streamId };
   }
   if (!conversationId) {
+    logger.warn("stream invalid payload", { streamId, reason: "conversationId is required" });
     emitError(event, streamId, new Error("conversationId is required"));
     return { streamId };
   }

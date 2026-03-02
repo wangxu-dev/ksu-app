@@ -41,7 +41,6 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       timeoutMs: 20_000,
       retryCount: 1,
       retryDelayMs: 300,
-      disableNodeFallback: true,
     };
   }
 
@@ -50,14 +49,13 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
     url.searchParams.set("random_number", String(Date.now()));
 
     return {
-      mode: "main",
+      mode: "renderer",
       method: "GET",
       url: url.toString(),
       headers: baseHeaders(token),
       timeoutMs: 35_000,
       retryCount: 1,
       retryDelayMs: 350,
-      disableNodeFallback: true,
     };
   }
 
@@ -68,7 +66,6 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       url: GRADES_URL,
       headers: baseHeaders(token),
       timeoutMs: 25_000,
-      disableNodeFallback: true,
     };
   }
 
@@ -82,7 +79,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
     url.searchParams.set("random_number", String(Date.now()));
 
     return {
-      mode: "main",
+      mode: "renderer",
       method: "GET",
       url: url.toString(),
       headers: {
@@ -91,7 +88,6 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       timeoutMs: 35_000,
       retryCount: 1,
       retryDelayMs: 350,
-      disableNodeFallback: true,
     };
   }
 

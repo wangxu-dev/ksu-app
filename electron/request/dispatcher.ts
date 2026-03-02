@@ -6,34 +6,15 @@ import { createLogger } from "../shared/logger.js";
 import type { UnifiedRequestPayload, UnifiedResponsePayload } from "./types.js";
 
 const logger = createLogger("request:dispatcher");
-const RENDERER_PREFERRED_HOSTS = new Set([
-  "cas.ksu.edu.cn",
-  "portal.ksu.edu.cn",
-  "portal-data.ksu.edu.cn",
-  "score-inquiry.ksu.edu.cn",
-  "jwnet.ksu.edu.cn",
-  "authx-service.ksu.edu.cn",
-]);
-
-function shouldUseRendererByHost(url: string): boolean {
-  try {
-    return RENDERER_PREFERRED_HOSTS.has(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
-
-function resolveMode(rawMode: unknown, url: string): { mode: "main" | "renderer"; source: string } {
+function resolveMode(rawMode: unknown): { mode: "main" | "renderer"; source: string } {
   if (rawMode === "main") return { mode: "main", source: "explicit" };
   if (rawMode === "renderer") return { mode: "renderer", source: "explicit" };
-  if (shouldUseRendererByHost(url)) return { mode: "renderer", source: "strategy" };
   return { mode: "main", source: "default" };
 }
 
-function resolveDisableNodeFallback(rawValue: unknown, modeSource: string): boolean {
+function resolveDisableNodeFallback(rawValue: unknown): boolean {
   if (typeof rawValue === "boolean") return rawValue;
-  // Keep TLS-safe behavior for strategy-selected requests unless explicitly overridden.
-  return modeSource === "strategy";
+  return false;
 }
 
 function normalizePayload(payload: unknown): UnifiedRequestPayload {
@@ -45,8 +26,8 @@ function normalizePayload(payload: unknown): UnifiedRequestPayload {
   const method = String(raw.method || "GET").toUpperCase();
   const url = String(raw.url || "");
   if (!url) throw new Error("url is required");
-  const resolved = resolveMode(raw.mode, url);
-  const disableNodeFallback = resolveDisableNodeFallback(raw.disableNodeFallback, resolved.source);
+  const resolved = resolveMode(raw.mode);
+  const disableNodeFallback = resolveDisableNodeFallback(raw.disableNodeFallback);
 
   return {
     requestId: raw.requestId || randomUUID(),
@@ -66,8 +47,7 @@ function normalizePayload(payload: unknown): UnifiedRequestPayload {
 function resolveModeSource(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "unknown";
   const raw = payload as Partial<UnifiedRequestPayload>;
-  const url = String(raw.url || "");
-  return resolveMode(raw.mode, url).source;
+  return resolveMode(raw.mode).source;
 }
 
 async function dispatchRequest(
@@ -108,9 +88,25 @@ async function dispatchRequest(
     disableNodeFallback: request.disableNodeFallback,
   });
   if (request.mode === "main") {
-    return requestViaMain(event.sender.session, request);
+    const result = await requestViaMain(event.sender.session, request);
+    logger.debug("dispatch result", {
+      requestId: request.requestId,
+      mode: request.mode,
+      ok: result.ok,
+      status: result.status,
+      errorCode: result.errorCode,
+    });
+    return result;
   }
-  return requestViaRenderer(ipcMain, event, request);
+  const result = await requestViaRenderer(ipcMain, event, request);
+  logger.debug("dispatch result", {
+    requestId: request.requestId,
+    mode: request.mode,
+    ok: result.ok,
+    status: result.status,
+    errorCode: result.errorCode,
+  });
+  return result;
 }
 
 export { dispatchRequest };

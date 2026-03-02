@@ -35,7 +35,7 @@ async function executeRendererFetch(task: RendererRequestTask): Promise<Renderer
       method: task.method,
       headers: task.headers,
       body: task.body,
-      credentials: "include",
+      credentials: "omit",
       redirect: task.followRedirects === false ? "manual" : "follow",
       signal: controller.signal,
     });

@@ -14,6 +14,7 @@ function resolveLevel(): LogLevel {
   if (raw in LEVEL_PRIORITY) return raw as LogLevel;
   if (String(process.env.DEBUG || "") === "1") return "debug";
   if (String(process.env.ELECTRON_DEBUG || "") === "1") return "debug";
+  if (String(process.env.ELECTRON_RENDERER_URL || "")) return "debug";
   return "info";
 }
 
