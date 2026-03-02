@@ -103,6 +103,7 @@ function toUIMessages(
 }
 
 function AssistantContent() {
+  const TOOL_NOTICE_MIN_MS = 800;
   const token = getSavedToken() || "";
   const [prompt, setPrompt] = useState("");
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
@@ -111,8 +112,10 @@ function AssistantContent() {
   const [showSettings, setShowSettings] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [toolNotice, setToolNotice] = useState<{ labels: string; until: number } | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesBottomRef = useRef<HTMLDivElement | null>(null);
+  const toolNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refreshConversations() {
     const items = await listConversations();
@@ -151,6 +154,45 @@ function AssistantContent() {
     if (!shouldAutoScroll) return;
     messagesBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status, shouldAutoScroll]);
+
+  useEffect(() => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    const runningToolLabels = lastAssistant
+      ? extractToolActivities(lastAssistant)
+          .filter((activity) => activity.state === "running")
+          .map((activity) => activity.label)
+      : [];
+
+    if (toolNoticeTimerRef.current) {
+      clearTimeout(toolNoticeTimerRef.current);
+      toolNoticeTimerRef.current = null;
+    }
+
+    if (runningToolLabels.length > 0) {
+      setToolNotice({
+        labels: runningToolLabels.join("、"),
+        until: Date.now() + TOOL_NOTICE_MIN_MS,
+      });
+      return;
+    }
+
+    setToolNotice((prev) => {
+      if (!prev) return null;
+      const remain = prev.until - Date.now();
+      if (remain <= 0) return null;
+      toolNoticeTimerRef.current = setTimeout(() => setToolNotice(null), remain);
+      return prev;
+    });
+  }, [messages]);
+
+  useEffect(
+    () => () => {
+      if (toolNoticeTimerRef.current) {
+        clearTimeout(toolNoticeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     Promise.all([refreshConversations(), getAssistantSettings()]).then(async ([items, cfg]) => {
@@ -276,10 +318,13 @@ function AssistantContent() {
           );
           const isUser = m.role === "user";
           const hasText = content.trim().length > 0;
-          const shouldShowWaiting =
-            !isUser && status === "streaming" && !hasText && toolActivities.length === 0;
-          const shouldShowToolRunning = !isUser && !hasText && toolActivities.length > 0;
-          const runningToolNames = toolActivities.map((activity) => activity.label).join("、");
+          const runningToolNames = toolActivities.map((activity) => activity.label).join(" / ");
+          const visibleToolNames = runningToolNames || toolNotice?.labels || "";
+          const statusText =
+            !isUser && !hasText
+              ? visibleToolNames || (status === "streaming" ? "思考中..." : "")
+              : "";
+          const shouldShowStatus = statusText.length > 0;
 
           return (
             <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -312,15 +357,9 @@ function AssistantContent() {
                   </div>
                 ) : null}
 
-                {shouldShowWaiting ? (
-                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                    思考中...
-                  </div>
-                ) : null}
-
-                {shouldShowToolRunning ? (
-                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                    {runningToolNames}
+                {shouldShowStatus ? (
+                  <div className="animate-[pulse_2.8s_ease-in-out_infinite] truncate whitespace-nowrap text-sm text-foreground/70">
+                    {statusText}
                   </div>
                 ) : null}
               </div>
@@ -330,8 +369,8 @@ function AssistantContent() {
         {showOptimisticAssistant ? (
           <div className="flex justify-start">
             <div className="max-w-[82%]">
-              <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                思考中...
+              <div className="animate-[pulse_2.8s_ease-in-out_infinite] truncate whitespace-nowrap text-sm text-foreground/70">
+                {toolNotice?.labels || "思考中..."}
               </div>
             </div>
           </div>
