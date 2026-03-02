@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DirectChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
-import { MessageSquareText, Plus, SendHorizontal, Settings2, X } from "lucide-react";
+import { MessageSquareText, Plus, SendHorizontal, Settings2, Trash2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
 import {
   createConversation,
+  deleteConversation,
   getAssistantSettings,
   getConversationMessages,
   listConversations,
@@ -182,11 +183,36 @@ function AssistantContent() {
   const showOptimisticAssistant = status === "submitted" && lastMessage?.role === "user";
 
   async function onNewConversation() {
+    const isCurrentEmpty =
+      messages.length === 0 && !prompt.trim() && status !== "submitted" && status !== "streaming";
+    if (isCurrentEmpty) {
+      setShowConversations(false);
+      return;
+    }
     const created = await createConversation("新对话");
     setConversations((prev) => [created, ...prev]);
     setActiveConversationId(created.id);
     setMessages([]);
     setShowConversations(false);
+  }
+
+  async function onDeleteConversation(conversationId: string) {
+    const result = await deleteConversation(conversationId);
+    if (!result.ok) return;
+    const items = await refreshConversations();
+    if (items.length === 0) {
+      const created = await createConversation("新对话");
+      setConversations([created]);
+      setActiveConversationId(created.id);
+      setMessages([]);
+      return;
+    }
+    if (activeConversationId === conversationId) {
+      const next = items[0];
+      setActiveConversationId(next.id);
+      const rows = await getConversationMessages(next.id);
+      setMessages(toUIMessages(rows) as any);
+    }
   }
 
   async function onSelectConversation(conversationId: string) {
@@ -351,17 +377,29 @@ function AssistantContent() {
           </div>
           <div className="max-h-95 space-y-1 overflow-auto">
             {conversations.map((c) => (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                onClick={() => onSelectConversation(c.id)}
-                className={`w-full rounded-md border p-2 text-left text-sm ${activeConversationId === c.id ? "bg-muted" : ""}`}
+                className={`flex items-start gap-1 rounded-md border p-2 text-sm ${activeConversationId === c.id ? "bg-muted" : ""}`}
               >
-                <div className="truncate font-medium">{c.title}</div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {c.preview || "暂无消息"}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectConversation(c.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate font-medium">{c.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {c.preview || "暂无消息"}
+                  </div>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={() => onDeleteConversation(c.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             ))}
           </div>
         </div>

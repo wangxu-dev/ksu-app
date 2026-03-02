@@ -47,6 +47,7 @@ type AssistantStore = {
   getSettings: () => AssistantSettings;
   setSettings: (patch: SettingsPatch) => AssistantSettings;
   createConversation: (title?: string) => ConversationRecord | undefined;
+  deleteConversation: (conversationId: string) => { ok: boolean };
   listConversations: () => ConversationListItem[];
   getMessages: (conversationId: string) => MessageRecord[];
   addMessage: (conversationId: string, role: AssistantRole, content: string) => string;
@@ -117,6 +118,7 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     "SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?",
   );
   const touchConversationStmt = db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?");
+  const deleteConversationStmt = db.prepare("DELETE FROM conversations WHERE id = ?");
   const addMessageStmt = db.prepare(
     "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
   );
@@ -170,6 +172,13 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     }));
   }
 
+  function deleteConversation(conversationId: string): { ok: boolean } {
+    const id = String(conversationId || "");
+    if (!id) return { ok: false };
+    const info = deleteConversationStmt.run(id);
+    return { ok: Number(info.changes || 0) > 0 };
+  }
+
   function getMessages(conversationId: string): MessageRecord[] {
     return listMessagesStmt.all(conversationId) as MessageRecord[];
   }
@@ -216,6 +225,7 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     getSettings,
     setSettings,
     createConversation,
+    deleteConversation,
     listConversations,
     getMessages,
     addMessage,

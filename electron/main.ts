@@ -26,6 +26,7 @@ import {
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
+  ASSISTANT_CONVERSATION_DELETE_CHANNEL,
   ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
@@ -321,6 +322,11 @@ app.whenReady().then(() => {
   );
   ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload: unknown) =>
     assistantStore.getMessages(
+      String((payload as { conversationId?: string } | undefined)?.conversationId || ""),
+    ),
+  );
+  ipcMain.handle(ASSISTANT_CONVERSATION_DELETE_CHANNEL, async (_event, payload: unknown) =>
+    assistantStore.deleteConversation(
       String((payload as { conversationId?: string } | undefined)?.conversationId || ""),
     ),
   );

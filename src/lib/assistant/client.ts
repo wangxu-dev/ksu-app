@@ -3,6 +3,7 @@ import {
   ASSISTANT_MCP_CALL_TOOL_CHANNEL,
   ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
+  ASSISTANT_CONVERSATION_DELETE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
   ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
@@ -62,6 +63,10 @@ export function createConversation(title?: string): Promise<AssistantConversatio
 
 export function getConversationMessages(conversationId: string): Promise<AssistantMessage[]> {
   return ipcInvoke<AssistantMessage[]>(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, { conversationId });
+}
+
+export function deleteConversation(conversationId: string): Promise<{ ok: boolean }> {
+  return ipcInvoke<{ ok: boolean }>(ASSISTANT_CONVERSATION_DELETE_CHANNEL, { conversationId });
 }
 
 export function replaceConversationMessages(

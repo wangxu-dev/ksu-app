@@ -5,6 +5,7 @@ export const ASSISTANT_STREAM_ERROR_CHANNEL = "assistant:stream:error";
 export const ASSISTANT_CONVERSATION_CREATE_CHANNEL = "assistant:conversation:create";
 export const ASSISTANT_CONVERSATION_LIST_CHANNEL = "assistant:conversation:list";
 export const ASSISTANT_CONVERSATION_MESSAGES_CHANNEL = "assistant:conversation:messages";
+export const ASSISTANT_CONVERSATION_DELETE_CHANNEL = "assistant:conversation:delete";
 export const ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL =
   "assistant:conversation:replace-messages";
 export const ASSISTANT_SETTINGS_GET_CHANNEL = "assistant:settings:get";
