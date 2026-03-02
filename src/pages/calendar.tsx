@@ -10,6 +10,7 @@ import { getSavedToken } from "@/lib/auth";
 import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
 import { formatYearMonth, weekText } from "@/lib/calendar";
 import { getCalendarMonth } from "@/lib/api/ksu";
+import { toUserMessage } from "@/lib/errors/user-message";
 
 function addMonths(date: Date, delta: number) {
   const d = new Date(date);
@@ -55,11 +56,7 @@ function CalendarContent() {
   const days = calendarQuery.data ?? [];
   const fetchedAt = calendarQuery.dataUpdatedAt || null;
   const isLoading = calendarQuery.isFetching;
-  const error = calendarQuery.error
-    ? calendarQuery.error instanceof Error
-      ? calendarQuery.error.message
-      : "获取校历失败"
-    : null;
+  const error = calendarQuery.error ? toUserMessage(calendarQuery.error, "获取校历失败") : null;
 
   const dayByDate = useMemo(() => {
     const m = new Map<string, (typeof days)[number]>();

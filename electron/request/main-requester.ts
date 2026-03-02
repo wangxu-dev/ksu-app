@@ -54,6 +54,7 @@ async function executeOnce(
     });
 
     return {
+      requestId: payload.requestId,
       ok: response.ok,
       status: response.status,
       headers,
@@ -80,6 +81,7 @@ async function requestViaMain(
       if (!shouldRetry) return result;
 
       logger.warn("retrying request after retryable status", {
+        requestId: payload.requestId,
         url: payload.url,
         method,
         status: result.status,
@@ -92,6 +94,7 @@ async function requestViaMain(
       const shouldRetry = attempt < retryCount && method === "GET" && shouldRetryError(error);
       if (shouldRetry) {
         logger.warn("retrying request after transient error", {
+          requestId: payload.requestId,
           url: payload.url,
           method,
           error: error instanceof Error ? error.message : String(error),
@@ -102,6 +105,7 @@ async function requestViaMain(
         continue;
       }
       return {
+        requestId: payload.requestId,
         ok: false,
         status: 0,
         headers: {},
@@ -113,6 +117,7 @@ async function requestViaMain(
   }
 
   return {
+    requestId: payload.requestId,
     ok: false,
     status: 0,
     headers: {},

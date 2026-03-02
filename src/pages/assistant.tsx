@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/page-header";
 import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
+import { toUserMessage } from "@/lib/errors/user-message";
 import {
   createConversation,
   getAssistantSettings,
@@ -111,7 +112,7 @@ function AssistantContent() {
       setActiveStreamId("");
       setPendingUserText("");
       setStreamingAssistantText("");
-      setStreamError(payload.error || "assistant failed");
+      setStreamError(toUserMessage(payload.error || "assistant failed", "助手请求失败"));
       const currentConversationId = activeConversationIdRef.current;
       if (!currentConversationId) return;
       void Promise.all([loadConversationMessages(currentConversationId), refreshConversations()]);
@@ -180,7 +181,7 @@ function AssistantContent() {
     } catch (error) {
       setPendingUserText("");
       setStreamingAssistantText("");
-      setStreamError(error instanceof Error ? error.message : "发送失败");
+      setStreamError(toUserMessage(error, "发送失败"));
     }
   }
 

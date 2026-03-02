@@ -20,6 +20,7 @@ function requestViaRenderer(
   if (!window || window.isDestroyed()) {
     logger.error("renderer window unavailable");
     return Promise.resolve({
+      requestId: payload.requestId,
       ok: false,
       status: 0,
       headers: {},
@@ -29,7 +30,7 @@ function requestViaRenderer(
     });
   }
 
-  const requestId = randomUUID();
+  const requestId = payload.requestId || randomUUID();
   const timeoutMs = payload.timeoutMs ?? 30_000;
   logger.debug("send renderer task", {
     requestId,
@@ -59,11 +60,13 @@ function requestViaRenderer(
         status: Number(result.status || 0),
       });
       resolve({
+        requestId,
         ok: !!result.ok,
         status: Number(result.status || 0),
         headers: result.headers || {},
         body: result.body || "",
         error: result.error,
+        errorCode: result.errorCode,
       });
     };
 
@@ -77,6 +80,7 @@ function requestViaRenderer(
         timeoutMs,
       });
       resolve({
+        requestId,
         ok: false,
         status: 0,
         headers: {},

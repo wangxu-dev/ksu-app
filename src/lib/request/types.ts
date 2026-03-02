@@ -4,6 +4,7 @@ export type UnifiedRequestPayload = {
   mode: RequestMode;
   method: string;
   url: string;
+  requestId?: string;
   headers?: Record<string, string>;
   body?: string;
   timeoutMs?: number;
@@ -18,6 +19,7 @@ export type UnifiedResponsePayload = {
   status: number;
   headers: Record<string, string>;
   body: string;
+  requestId?: string;
   error?: string;
   errorCode?: string;
 };

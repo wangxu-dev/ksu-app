@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { requestViaMain } from "./main-requester.js";
 import { requestViaRenderer } from "./renderer-requester.js";
@@ -48,6 +49,7 @@ function normalizePayload(payload: unknown): UnifiedRequestPayload {
   const disableNodeFallback = resolveDisableNodeFallback(raw.disableNodeFallback, resolved.source);
 
   return {
+    requestId: raw.requestId || randomUUID(),
     mode: resolved.mode,
     method,
     url,
@@ -79,10 +81,13 @@ async function dispatchRequest(
     request = normalizePayload(payload);
     modeSource = resolveModeSource(payload);
   } catch (error) {
+    const requestId = randomUUID();
     logger.error("normalize payload failed", {
+      requestId,
       error: error instanceof Error ? error.message : String(error),
     });
     return {
+      requestId,
       ok: false,
       status: 0,
       headers: {},
@@ -93,6 +98,7 @@ async function dispatchRequest(
   }
 
   logger.debug("dispatch request", {
+    requestId: request.requestId,
     mode: request.mode,
     modeSource,
     method: request.method,

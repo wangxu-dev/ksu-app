@@ -9,6 +9,7 @@ import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
 import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
 import { getGrades } from "@/lib/api/ksu";
+import { toUserMessage } from "@/lib/errors/user-message";
 import { getCachedGrades } from "@/lib/grades";
 
 function formatDateTime(ts: number) {
@@ -47,11 +48,7 @@ function GradesContent() {
   const data = gradesQuery.data ?? null;
   const fetchedAt = gradesQuery.dataUpdatedAt || null;
   const isLoading = gradesQuery.isFetching;
-  const error = gradesQuery.error
-    ? gradesQuery.error instanceof Error
-      ? gradesQuery.error.message
-      : "获取成绩失败"
-    : null;
+  const error = gradesQuery.error ? toUserMessage(gradesQuery.error, "获取成绩失败") : null;
 
   const summary = useMemo(() => {
     if (!data) return null;

@@ -17,6 +17,7 @@ import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
 import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
 import { formatYearMonth, weekText } from "@/lib/calendar";
 import { getCalendarMonth, getGrades, getPersonalInfo } from "@/lib/api/ksu";
+import { toUserMessage } from "@/lib/errors/user-message";
 import { getCachedGrades } from "@/lib/grades";
 import { getCachedPersonalInfo } from "@/lib/personal";
 
@@ -70,9 +71,7 @@ function HomeContent() {
   const day = calendarQuery.data?.find((d) => d.rq === today);
   const week = day ? weekText(day.zc) : null;
   const personalError = personalQuery.error
-    ? personalQuery.error instanceof Error
-      ? personalQuery.error.message
-      : "获取个人信息失败"
+    ? toUserMessage(personalQuery.error, "获取个人信息失败")
     : null;
   const isLoading = personalQuery.isLoading;
 
