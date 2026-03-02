@@ -19,6 +19,7 @@ import {
 import {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
+  NEWS_OPEN_CHANNEL,
   PROXY_REQUEST_CHANNEL,
 } from "./request/channels.js";
 import {
@@ -226,6 +227,48 @@ function bindInspectContextMenu(win: BrowserWindow): void {
   });
 }
 
+function openNewsWindow(input: { url?: string; token?: string; title?: string }): { ok: boolean } {
+  const rawUrl = String(input.url || "").trim();
+  const token = String(input.token || "").trim();
+  const title = String(input.title || "校园新闻").trim() || "校园新闻";
+  if (!rawUrl) {
+    throw new Error("news url is required");
+  }
+  const target = new URL(rawUrl);
+  if (!["http:", "https:"].includes(target.protocol)) {
+    throw new Error("invalid news url protocol");
+  }
+
+  const win = new BrowserWindow({
+    width: 1080,
+    height: 760,
+    minWidth: 900,
+    minHeight: 620,
+    autoHideMenuBar: true,
+    title,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const extraHeaders = [
+    `x-id-token: ${token}`,
+    "x-device-info: PC",
+    "x-terminal-info: PC",
+    "accept-language: zh-CN,zh;q=0.9,en;q=0.8",
+    "Referer: https://portal.ksu.edu.cn/main.html",
+  ].join("\n");
+
+  win.loadURL(target.toString(), {
+    httpReferrer: "https://portal.ksu.edu.cn/main.html",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    extraHeaders,
+  });
+
+  return { ok: true };
+}
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
   logger.info("app ready");
@@ -287,6 +330,9 @@ app.whenReady().then(() => {
   });
   ipcMain.handle(PROXY_REQUEST_CHANNEL, async (event, payload: unknown) =>
     dispatchRequest(ipcMain, event, payload),
+  );
+  ipcMain.handle(NEWS_OPEN_CHANNEL, async (_event, payload: unknown) =>
+    openNewsWindow((payload || {}) as { url?: string; token?: string; title?: string }),
   );
   ipcMain.handle(APP_UPDATE_GET_STATUS_CHANNEL, async () => updateManager.getStatus());
   ipcMain.handle(APP_UPDATE_CHECK_CHANNEL, async () => updateManager.checkForUpdates());

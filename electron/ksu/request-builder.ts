@@ -5,13 +5,24 @@ const PERSONAL_INFO_URL =
   "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getPersonalInfo";
 const GRADES_URL = "https://score-inquiry.ksu.edu.cn/api/std-grade/detail?project=1";
 const CALENDAR_URL = "https://portal-data.ksu.edu.cn/portalCenter/v2/personalData/getXlInfo";
+const CAMPUS_NEWS_URL = "https://portal.ksu.edu.cn/portal-api/v1/cms/content/getColumncontents";
+const CAMPUS_NEWS_HOT_URL = "https://portal.ksu.edu.cn/portal-api/v1/cms/content/getHotCms";
 
-type KsuEndpoint = "userInfo" | "personalInfo" | "grades" | "calendarMonth";
+type KsuEndpoint =
+  | "userInfo"
+  | "personalInfo"
+  | "grades"
+  | "calendarMonth"
+  | "campusNews"
+  | "campusNewsHot";
 
 type KsuRequestPayload = {
   endpoint: KsuEndpoint;
   token: string;
   yearMonth?: string;
+  columnId?: string;
+  pageNo?: number;
+  pageSize?: number;
 };
 
 function baseHeaders(token: string): Record<string, string> {
@@ -86,6 +97,50 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
         "x-id-token": token,
       },
       timeoutMs: 35_000,
+      retryCount: 1,
+      retryDelayMs: 350,
+    };
+  }
+
+  if (endpoint === "campusNews") {
+    const url = new URL(CAMPUS_NEWS_URL);
+    url.searchParams.set("kw", "");
+    url.searchParams.set("columnId", payload.columnId || "remote-a");
+    url.searchParams.set("pageNo", String(payload.pageNo || 1));
+    url.searchParams.set("pageSize", String(payload.pageSize || 5));
+    url.searchParams.set("loadContent", "false");
+    url.searchParams.set("loadPicContents", "false");
+
+    return {
+      mode: "renderer",
+      method: "GET",
+      url: url.toString(),
+      headers: {
+        ...baseHeaders(token),
+        referer: "https://portal.ksu.edu.cn/main.html",
+      },
+      timeoutMs: 25_000,
+      retryCount: 1,
+      retryDelayMs: 350,
+    };
+  }
+
+  if (endpoint === "campusNewsHot") {
+    const url = new URL(CAMPUS_NEWS_HOT_URL);
+    url.searchParams.set("columnId", payload.columnId || "remote-a");
+    url.searchParams.set("pageNo", String(payload.pageNo || 1));
+    url.searchParams.set("pageSize", String(payload.pageSize || 5));
+    url.searchParams.set("random_number", String(Date.now()));
+
+    return {
+      mode: "renderer",
+      method: "GET",
+      url: url.toString(),
+      headers: {
+        ...baseHeaders(token),
+        referer: "https://portal.ksu.edu.cn/main.html",
+      },
+      timeoutMs: 25_000,
       retryCount: 1,
       retryDelayMs: 350,
     };

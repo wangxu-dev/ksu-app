@@ -11,6 +11,10 @@ export const KSU_CACHE_POLICY = {
     keyPrefix: "ksu:calendar:v1",
     ttlMs: 30 * 24 * 60 * 60 * 1000,
   },
+  news: {
+    keyPrefix: "ksu:news:v1",
+    ttlMs: 10 * 60 * 1000,
+  },
 } as const;
 
 export type CachePolicyKey = keyof typeof KSU_CACHE_POLICY;

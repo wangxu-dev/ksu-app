@@ -1,12 +1,14 @@
 const AUTH_LOGIN_CHANNEL = "auth:login";
 const KSU_REQUEST_CHANNEL = "ksu:request";
 const PROXY_REQUEST_CHANNEL = "proxy:request";
+const NEWS_OPEN_CHANNEL = "news:open";
 const REQUESTER_TASK_CHANNEL = "requester:task";
 const REQUESTER_RESULT_CHANNEL = "requester:result";
 
 export {
   AUTH_LOGIN_CHANNEL,
   KSU_REQUEST_CHANNEL,
+  NEWS_OPEN_CHANNEL,
   PROXY_REQUEST_CHANNEL,
   REQUESTER_TASK_CHANNEL,
   REQUESTER_RESULT_CHANNEL,
