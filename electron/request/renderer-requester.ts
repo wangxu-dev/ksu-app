@@ -25,6 +25,7 @@ function requestViaRenderer(
       headers: {},
       body: "",
       error: "renderer window unavailable",
+      errorCode: "RENDERER_WINDOW_UNAVAILABLE",
     });
   }
 
@@ -81,6 +82,7 @@ function requestViaRenderer(
         headers: {},
         body: "",
         error: "renderer requester timeout",
+        errorCode: "RENDERER_REQUEST_TIMEOUT",
       });
     }, timeoutMs + 1_000);
 

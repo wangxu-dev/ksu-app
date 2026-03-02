@@ -41,6 +41,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       timeoutMs: 20_000,
       retryCount: 1,
       retryDelayMs: 300,
+      disableNodeFallback: true,
     };
   }
 
@@ -56,6 +57,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       timeoutMs: 35_000,
       retryCount: 1,
       retryDelayMs: 350,
+      disableNodeFallback: true,
     };
   }
 
@@ -66,6 +68,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       url: GRADES_URL,
       headers: baseHeaders(token),
       timeoutMs: 25_000,
+      disableNodeFallback: true,
     };
   }
 
@@ -88,6 +91,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
       timeoutMs: 35_000,
       retryCount: 1,
       retryDelayMs: 350,
+      disableNodeFallback: true,
     };
   }
 

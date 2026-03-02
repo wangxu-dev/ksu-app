@@ -264,6 +264,7 @@ app.whenReady().then(() => {
         headers: {},
         body: "",
         error: error instanceof Error ? error.message : "ksu request build failed",
+        errorCode: "KSU_REQUEST_BUILD_FAILED",
       };
     }
   });

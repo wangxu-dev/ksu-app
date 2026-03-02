@@ -17,6 +17,14 @@ function shouldRetryResponse(method: string, status: number): boolean {
   return method === "GET" && RETRYABLE_STATUS.has(status);
 }
 
+function resolveErrorCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (message.includes("aborted") || message.includes("Timeout") || message.includes("timed out")) {
+    return "NETWORK_TIMEOUT";
+  }
+  return "NETWORK_ERROR";
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -37,6 +45,7 @@ async function executeOnce(
       redirect: payload.followRedirects ? "follow" : "manual",
       signal: controller.signal,
       timeoutMs,
+      disableNodeFallback: Boolean(payload.disableNodeFallback),
     });
 
     const headers: Record<string, string> = {};
@@ -98,6 +107,7 @@ async function requestViaMain(
         headers: {},
         body: "",
         error: error instanceof Error ? error.message : "main requester failed",
+        errorCode: resolveErrorCode(error),
       };
     }
   }
@@ -108,6 +118,7 @@ async function requestViaMain(
     headers: {},
     body: "",
     error: "main requester failed",
+    errorCode: "NETWORK_ERROR",
   };
 }
 

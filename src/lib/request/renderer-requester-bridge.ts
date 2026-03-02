@@ -12,6 +12,13 @@ function headersToRecord(headers: Headers): Record<string, string> {
   return out;
 }
 
+function resolveErrorCode(error: unknown): string {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "NETWORK_TIMEOUT";
+  }
+  return "NETWORK_ERROR";
+}
+
 async function executeRendererFetch(task: RendererRequestTask): Promise<RendererRequestResult> {
   const controller = new AbortController();
   const timeoutMs = task.timeoutMs ?? 30_000;
@@ -54,6 +61,7 @@ async function executeRendererFetch(task: RendererRequestTask): Promise<Renderer
       headers: {},
       body: "",
       error: error instanceof Error ? error.message : "renderer request failed",
+      errorCode: resolveErrorCode(error),
     };
   } finally {
     console.debug("[renderer-requester] done", {

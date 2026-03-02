@@ -10,6 +10,7 @@ type UnifiedRequestPayload = {
   followRedirects?: boolean;
   retryCount?: number;
   retryDelayMs?: number;
+  disableNodeFallback?: boolean;
 };
 
 type UnifiedResponsePayload = {
@@ -18,6 +19,7 @@ type UnifiedResponsePayload = {
   headers: Record<string, string>;
   body: string;
   error?: string;
+  errorCode?: string;
 };
 
 type RendererRequestTask = UnifiedRequestPayload & {

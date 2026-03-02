@@ -5,6 +5,7 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { createBrowserHistory, createHashHistory } from "@tanstack/history";
 import "./index.css";
 import { createQueryClient } from "@/lib/query/client";
+import { startRendererRequesterBridge } from "@/lib/request/renderer-requester-bridge";
 import { initTheme } from "@/lib/theme";
 
 import { routeTree } from "./routeTree.gen";
@@ -21,6 +22,7 @@ declare module "@tanstack/react-router" {
 }
 
 initTheme();
+startRendererRequesterBridge();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
