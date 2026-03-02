@@ -37,6 +37,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const logger = createLogger("main");
+const VERBOSE_RENDERER_LOGS = String(process.env.LOG_VERBOSE_RENDERER || "") === "1";
 
 function resolveIconPath(): string {
   const icoPath = path.join(__dirname, "..", "build", "icons", "icon.ico");
@@ -128,13 +129,28 @@ function createWindow(): void {
       isPackaged: app.isPackaged,
     });
   });
-  win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
-    logger.error("renderer console message", {
+  win.webContents.on("console-message", (_event, details: unknown) => {
+    const payload = (details || {}) as {
+      level?: number;
+      message?: string;
+      lineNumber?: number;
+      sourceId?: string;
+    };
+    const level = Number(payload.level || 0);
+    const meta = {
       level,
-      message,
-      line,
-      sourceId,
-    });
+      message: String(payload.message || ""),
+      line: Number(payload.lineNumber || 0),
+      sourceId: String(payload.sourceId || ""),
+    };
+    // Chromium levels: 0=log, 1=warn, 2=error, 3=debug-like internal noise
+    if (level >= 2) {
+      logger.error("renderer console message", meta);
+      return;
+    }
+    if (VERBOSE_RENDERER_LOGS) {
+      logger.debug("renderer console message", meta);
+    }
   });
   win.webContents.on("render-process-gone", (_event, details) => {
     logger.error("renderer process gone", details ? { ...details } : {});
@@ -264,6 +280,7 @@ app.whenReady().then(() => {
         headers: {},
         body: "",
         error: error instanceof Error ? error.message : "ksu request build failed",
+        errorCode: "KSU_REQUEST_BUILD_FAILED",
       };
     }
   });
@@ -275,21 +292,27 @@ app.whenReady().then(() => {
   ipcMain.handle(APP_UPDATE_INSTALL_CHANNEL, async () => ({
     ok: updateManager.installDownloaded(),
   }));
-  ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload: unknown) =>
-    runAssistantStream({
+  ipcMain.handle(ASSISTANT_STREAM_START_CHANNEL, async (event, payload: unknown) => {
+    const safePayload = (payload || {}) as {
+      message?: string;
+      token?: string;
+      conversationId?: string;
+      apiKey?: string;
+      model?: string;
+      baseUrl?: string;
+    };
+    logger.info("assistant stream request received", {
+      conversationId: String(safePayload.conversationId || ""),
+      hasToken: Boolean(String(safePayload.token || "")),
+      messageLength: String(safePayload.message || "").trim().length,
+    });
+    return runAssistantStream({
       event,
-      payload: (payload || {}) as {
-        message?: string;
-        token?: string;
-        conversationId?: string;
-        apiKey?: string;
-        model?: string;
-        baseUrl?: string;
-      },
+      payload: safePayload,
       store: assistantStore,
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
-    }),
-  );
+    });
+  });
   ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload: unknown) =>
     assistantStore.createConversation((payload as { title?: string } | undefined)?.title),
   );

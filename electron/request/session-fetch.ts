@@ -3,14 +3,18 @@ import { createLogger } from "../shared/logger.js";
 
 const logger = createLogger("request:session");
 const DEFAULT_TIMEOUT_MS = 15000;
-
 type SessionFetchInit = RequestInit & {
   timeoutMs?: number;
+  disableNodeFallback?: boolean;
 };
 
 function shouldFallbackToNode(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || "");
   return message.includes("ERR_BLOCKED_BY_CLIENT") || message.includes("Redirect was cancelled");
+}
+
+function shouldAllowNodeFallback(init: SessionFetchInit): boolean {
+  return !init.disableNodeFallback;
 }
 
 function resolveSignal(init: SessionFetchInit, timeoutMs: number): AbortSignal | null | undefined {
@@ -32,6 +36,7 @@ async function sessionFetch(
     signal: resolveSignal(init, timeoutMs),
   };
   delete mergedInit.timeoutMs;
+  delete mergedInit.disableNodeFallback;
 
   logger.debug("fetch start", {
     url,
@@ -54,7 +59,7 @@ async function sessionFetch(
         url,
         error: error instanceof Error ? error.message : String(error),
       });
-      if (!shouldFallbackToNode(error)) {
+      if (!shouldFallbackToNode(error) || !shouldAllowNodeFallback(init)) {
         throw error;
       }
       const response = await fetch(url, mergedInit);

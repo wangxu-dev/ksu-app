@@ -5,10 +5,17 @@ import {
   clearRememberedAccount,
   saveAuth,
   saveRememberedAccount,
+  type PersonalInfoData,
   type UserInfoData,
 } from "@/lib/auth";
 import { getCalendarMonth, getGrades, getPersonalInfo, getUserInfo } from "@/lib/api/ksu";
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
 import { getCachedGrades, setCachedGrades, type CachedGrades, type GradesData } from "@/lib/grades";
+import {
+  getCachedPersonalInfo,
+  setCachedPersonalInfo,
+  type CachedPersonalInfo,
+} from "@/lib/personal";
 import {
   formatYearMonth,
   getCachedCalendarMonth,
@@ -80,15 +87,28 @@ export async function validateToken(token: string): Promise<UserInfoData> {
   return user;
 }
 
-export async function fetchDashboard(token: string) {
-  return getPersonalInfo(token);
+export async function fetchDashboard(
+  token: string,
+  opts?: { maxAgeMs?: number; force?: boolean },
+): Promise<PersonalInfoData> {
+  const maxAgeMs = opts?.maxAgeMs ?? KSU_CACHE_POLICY.personalInfo.ttlMs;
+  const cached: CachedPersonalInfo | null = getCachedPersonalInfo();
+  const isFresh = cached ? Date.now() - cached.fetchedAt <= maxAgeMs : false;
+
+  if (cached && isFresh && !opts?.force) {
+    return cached.data;
+  }
+
+  const data = await getPersonalInfo(token);
+  setCachedPersonalInfo(data);
+  return data;
 }
 
 export async function getGradesCached(
   token: string,
   opts?: { maxAgeMs?: number; force?: boolean },
 ): Promise<{ data: GradesData; cached: boolean; fetchedAt: number }> {
-  const maxAgeMs = opts?.maxAgeMs ?? 24 * 60 * 60 * 1000;
+  const maxAgeMs = opts?.maxAgeMs ?? KSU_CACHE_POLICY.grades.ttlMs;
   const cached: CachedGrades | null = getCachedGrades();
   const isFresh = cached ? Date.now() - cached.fetchedAt <= maxAgeMs : false;
 
@@ -106,7 +126,7 @@ export async function getCalendarMonthCached(
   yearMonth: string,
   opts?: { maxAgeMs?: number; force?: boolean },
 ): Promise<{ data: CalendarDay[]; cached: boolean; fetchedAt: number }> {
-  const maxAgeMs = opts?.maxAgeMs ?? 30 * 24 * 60 * 60 * 1000;
+  const maxAgeMs = opts?.maxAgeMs ?? KSU_CACHE_POLICY.calendar.ttlMs;
   const cached = getCachedCalendarMonth(yearMonth);
   const isFresh = cached ? Date.now() - cached.fetchedAt <= maxAgeMs : false;
 

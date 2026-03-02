@@ -19,11 +19,30 @@ type RegisteredTool = {
   name: string;
   description: string;
   schema: z.ZodRawShape;
+  inputSchema: Record<string, unknown>;
+  outputSchema: Record<string, unknown>;
+  errorCodes: string[];
+  cachePolicy: {
+    scope: "none" | "memory" | "storage";
+    ttlMs: number;
+    note?: string;
+  };
   handler: (args: Record<string, unknown>, context: ToolContext) => Promise<unknown>;
 };
 
 type KsuMcpRegistry = {
-  listTools: () => Array<{ name: string; description: string }>;
+  listTools: () => Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+    errorCodes: string[];
+    cachePolicy: {
+      scope: "none" | "memory" | "storage";
+      ttlMs: number;
+      note?: string;
+    };
+  }>;
   callTool: (
     name: string,
     args: Record<string, unknown>,
@@ -55,45 +74,108 @@ function createKsuMcpRegistry({
     name: string,
     description: string,
     schema: z.ZodRawShape,
+    inputSchema: Record<string, unknown>,
+    outputSchema: Record<string, unknown>,
+    errorCodes: string[],
+    cachePolicy: {
+      scope: "none" | "memory" | "storage";
+      ttlMs: number;
+      note?: string;
+    },
     handler: RegisteredTool["handler"],
   ): void => {
-    tools.set(name, { name, description, schema, handler });
+    tools.set(name, {
+      name,
+      description,
+      schema,
+      inputSchema,
+      outputSchema,
+      errorCodes,
+      cachePolicy,
+      handler,
+    });
   };
 
-  register("get_user_info", "获取当前登录用户基础信息", {}, async (_args, context) => {
-    const token = requireToken(context);
-    const raw = parseResponse(
-      await callKsuEndpoint({ endpoint: "userInfo", token }),
-      "get_user_info",
-    );
-    if (raw.code !== 0 || !raw.data) throw new Error(String(raw.message || "get_user_info failed"));
-    return raw.data;
-  });
+  register(
+    "get_user_info",
+    "获取当前登录用户基础信息",
+    {},
+    { type: "object", properties: {}, required: [] },
+    { type: "object", nullable: false, description: "user profile data" },
+    ["TOKEN_REQUIRED", "UPSTREAM_REQUEST_FAILED", "INVALID_JSON", "UPSTREAM_BUSINESS_ERROR"],
+    { scope: "storage", ttlMs: 60 * 60 * 1000, note: "建议 1 小时内复用" },
+    async (_args, context) => {
+      const token = requireToken(context);
+      const raw = parseResponse(
+        await callKsuEndpoint({ endpoint: "userInfo", token }),
+        "get_user_info",
+      );
+      if (raw.code !== 0 || !raw.data) {
+        throw new Error(String(raw.message || "get_user_info failed"));
+      }
+      return raw.data;
+    },
+  );
 
-  register("get_personal_info", "获取个人概览信息", {}, async (_args, context) => {
-    const token = requireToken(context);
-    const raw = parseResponse(
-      await callKsuEndpoint({ endpoint: "personalInfo", token }),
-      "get_personal_info",
-    );
-    if (raw.code !== 0 || !raw.data)
-      throw new Error(String(raw.message || "get_personal_info failed"));
-    return raw.data;
-  });
+  register(
+    "get_personal_info",
+    "获取个人概览信息",
+    {},
+    { type: "object", properties: {}, required: [] },
+    { type: "object", nullable: false, description: "personal dashboard data" },
+    ["TOKEN_REQUIRED", "UPSTREAM_REQUEST_FAILED", "INVALID_JSON", "UPSTREAM_BUSINESS_ERROR"],
+    { scope: "storage", ttlMs: 6 * 60 * 60 * 1000, note: "建议 6 小时内复用" },
+    async (_args, context) => {
+      const token = requireToken(context);
+      const raw = parseResponse(
+        await callKsuEndpoint({ endpoint: "personalInfo", token }),
+        "get_personal_info",
+      );
+      if (raw.code !== 0 || !raw.data) {
+        throw new Error(String(raw.message || "get_personal_info failed"));
+      }
+      return raw.data;
+    },
+  );
 
-  register("get_grades", "获取成绩信息", {}, async (_args, context) => {
-    const token = requireToken(context);
-    const raw = parseResponse(await callKsuEndpoint({ endpoint: "grades", token }), "get_grades");
-    if (!raw.success || raw.code !== 200 || !raw.data) {
-      throw new Error(String(raw.msg || "get_grades failed"));
-    }
-    return raw.data;
-  });
+  register(
+    "get_grades",
+    "获取成绩信息",
+    {},
+    { type: "object", properties: {}, required: [] },
+    { type: "object", nullable: false, description: "grade list and GPA summary" },
+    ["TOKEN_REQUIRED", "UPSTREAM_REQUEST_FAILED", "INVALID_JSON", "UPSTREAM_BUSINESS_ERROR"],
+    { scope: "storage", ttlMs: 7 * 24 * 60 * 60 * 1000, note: "建议按周刷新" },
+    async (_args, context) => {
+      const token = requireToken(context);
+      const raw = parseResponse(await callKsuEndpoint({ endpoint: "grades", token }), "get_grades");
+      if (!raw.success || raw.code !== 200 || !raw.data) {
+        throw new Error(String(raw.msg || "get_grades failed"));
+      }
+      return raw.data;
+    },
+  );
 
   register(
     "get_calendar",
     "获取指定月份校历，格式如 2026年02月",
     { yearMonth: z.string() },
+    {
+      type: "object",
+      properties: {
+        yearMonth: { type: "string", description: "格式如 2026年02月" },
+      },
+      required: ["yearMonth"],
+    },
+    { type: "array", items: { type: "object" }, description: "calendar days of the month" },
+    [
+      "TOKEN_REQUIRED",
+      "INVALID_ARGUMENT",
+      "UPSTREAM_REQUEST_FAILED",
+      "INVALID_JSON",
+      "UPSTREAM_BUSINESS_ERROR",
+    ],
+    { scope: "storage", ttlMs: 30 * 24 * 60 * 60 * 1000, note: "按月缓存" },
     async (args, context) => {
       const token = requireToken(context);
       const yearMonth = String(args.yearMonth || "");
@@ -110,13 +192,26 @@ function createKsuMcpRegistry({
     },
   );
 
-  register("get_current_time", "获取当前本机时间", {}, async () => getCurrentTimePayload());
+  register(
+    "get_current_time",
+    "获取当前本机时间",
+    {},
+    { type: "object", properties: {}, required: [] },
+    { type: "object", description: "local time payload" },
+    [],
+    { scope: "none", ttlMs: 0, note: "实时数据，不缓存" },
+    async () => getCurrentTimePayload(),
+  );
 
   return {
     listTools() {
       const result = Array.from(tools.values()).map((t) => ({
         name: t.name,
         description: t.description,
+        inputSchema: t.inputSchema,
+        outputSchema: t.outputSchema,
+        errorCodes: t.errorCodes,
+        cachePolicy: t.cachePolicy,
       }));
       logger.debug("list tools", { count: result.length });
       return result;

@@ -37,8 +37,18 @@ async function fetchKsuJson<T>(payload: {
 }): Promise<T> {
   const response = await ipcInvoke<UnifiedResponsePayload>(KSU_REQUEST_CHANNEL, payload);
 
-  if (!response.ok && response.status === 0) {
-    throw new ApiError(response.error || "请求失败", { payload: response });
+  if (!response.ok) {
+    throw new ApiError(response.error || `请求失败: ${response.status}`, {
+      status: response.status,
+      payload: response,
+    });
+  }
+
+  if (!response.body) {
+    throw new ApiError("响应为空", {
+      status: response.status,
+      payload: response,
+    });
   }
 
   try {

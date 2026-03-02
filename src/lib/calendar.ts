@@ -1,3 +1,5 @@
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+
 export type CalendarDay = {
   xnxq: string;
   ny: string;
@@ -20,7 +22,7 @@ export type CachedCalendarMonth = {
 };
 
 function cacheKey(yearMonth: string) {
-  return `ksu:calendar:${yearMonth}`;
+  return `${KSU_CACHE_POLICY.calendar.keyPrefix}:${yearMonth}`;
 }
 
 export function getCachedCalendarMonth(yearMonth: string): CachedCalendarMonth | null {

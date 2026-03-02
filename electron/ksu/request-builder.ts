@@ -49,7 +49,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
     url.searchParams.set("random_number", String(Date.now()));
 
     return {
-      mode: "main",
+      mode: "renderer",
       method: "GET",
       url: url.toString(),
       headers: baseHeaders(token),
@@ -79,7 +79,7 @@ function buildKsuRequest(payload: KsuRequestPayload): UnifiedRequestPayload {
     url.searchParams.set("random_number", String(Date.now()));
 
     return {
-      mode: "main",
+      mode: "renderer",
       method: "GET",
       url: url.toString(),
       headers: {

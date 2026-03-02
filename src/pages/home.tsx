@@ -1,8 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
-import { HomeSearch } from "@/components/home-search";
-import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpen,
@@ -12,10 +9,17 @@ import {
   LibraryBig,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { fetchDashboard, getCalendarMonthCached, getGradesCached } from "@/lib/auth/service";
-import { getCachedGrades } from "@/lib/grades";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
+import { HomeSearch } from "@/components/home-search";
+import { getSavedToken, getSavedUser, type PersonalInfoData } from "@/lib/auth";
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
 import { formatYearMonth, weekText } from "@/lib/calendar";
+import { getCalendarMonth, getGrades, getPersonalInfo } from "@/lib/api/ksu";
+import { toUserMessage } from "@/lib/errors/user-message";
+import { getCachedGrades } from "@/lib/grades";
+import { getCachedPersonalInfo } from "@/lib/personal";
 
 export function Home() {
   return (
@@ -31,65 +35,45 @@ export function Home() {
 function HomeContent() {
   const navigate = useNavigate();
   const [user] = useState(() => getSavedUser());
-  const [personal, setPersonal] = useState<PersonalInfoData | null>(null);
-  const [personalError, setPersonalError] = useState<string | null>(null);
   const [token] = useState(() => getSavedToken());
-  const [isLoading, setIsLoading] = useState(false);
-  const [gpa, setGpa] = useState<string | null>(() => getCachedGrades()?.data?.gpa ?? null);
-  const [week, setWeek] = useState<string | null>(null);
+  const yearMonth = useMemo(() => formatYearMonth(new Date()), []);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   useEffect(() => {
-    let canceled = false;
-    if (!token) {
-      navigate({ to: "/login" });
-      return;
-    }
-
-    const load = async () => {
-      setIsLoading(true);
-      setPersonalError(null);
-      try {
-        const data = await fetchDashboard(token);
-        if (canceled) return;
-        setPersonal(data);
-      } catch (e) {
-        if (canceled) return;
-        setPersonal(null);
-        setPersonalError(e instanceof Error ? e.message : "获取个人信息失败");
-      } finally {
-        if (!canceled) {
-          setIsLoading(false);
-        }
-      }
-
-      try {
-        const res = await getGradesCached(token, { maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
-        if (canceled) return;
-        setGpa(res.data.gpa);
-      } catch {
-        // ignore
-      }
-
-      const ym = formatYearMonth(new Date());
-      const today = new Date().toISOString().slice(0, 10);
-      try {
-        const res = await getCalendarMonthCached(token, ym, {
-          maxAgeMs: 30 * 24 * 60 * 60 * 1000,
-        });
-        if (canceled) return;
-        const day = res.data.find((d) => d.rq === today);
-        setWeek(day ? weekText(day.zc) : null);
-      } catch {
-        // ignore
-      }
-    };
-
-    void load();
-
-    return () => {
-      canceled = true;
-    };
+    if (!token) navigate({ to: "/login" });
   }, [token, navigate]);
+
+  const personalQuery = useQuery({
+    queryKey: ["personal-info", token],
+    enabled: !!token,
+    staleTime: KSU_CACHE_POLICY.personalInfo.ttlMs,
+    queryFn: async () => getPersonalInfo(String(token)),
+    initialData: getCachedPersonalInfo()?.data,
+  });
+
+  const gradesQuery = useQuery({
+    queryKey: ["grades", token],
+    enabled: !!token,
+    staleTime: KSU_CACHE_POLICY.grades.ttlMs,
+    queryFn: async () => getGrades(String(token)),
+    initialData: getCachedGrades()?.data,
+  });
+
+  const calendarQuery = useQuery({
+    queryKey: ["calendar", token, yearMonth],
+    enabled: !!token,
+    staleTime: KSU_CACHE_POLICY.calendar.ttlMs,
+    queryFn: async () => getCalendarMonth(String(token), yearMonth),
+  });
+
+  const personal: PersonalInfoData | null = personalQuery.data ?? null;
+  const gpa = gradesQuery.data?.gpa ?? null;
+  const day = calendarQuery.data?.find((d) => d.rq === today);
+  const week = day ? weekText(day.zc) : null;
+  const personalError = personalQuery.error
+    ? toUserMessage(personalQuery.error, "获取个人信息失败")
+    : null;
+  const isLoading = personalQuery.isLoading;
 
   const formatCurrency = (v?: string) => {
     if (!v) return "--";

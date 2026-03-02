@@ -1,3 +1,5 @@
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+
 export type GradeCourse = {
   id: string;
   stdCode: string;
@@ -34,7 +36,7 @@ export type GradesRaw = {
   data?: GradesData | null;
 };
 
-const GRADES_KEY = "ksu:grades:project1";
+const GRADES_KEY = KSU_CACHE_POLICY.grades.key;
 
 export type CachedGrades = { fetchedAt: number; data: GradesData };
 

@@ -147,17 +147,6 @@ function AssistantContent() {
   });
 
   useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (!last) return;
-    console.debug("[assistant] state", {
-      status,
-      messageCount: messages.length,
-      lastRole: last.role,
-      parts: last.parts.map((part) => part.type),
-    });
-  }, [messages, status]);
-
-  useEffect(() => {
     if (!shouldAutoScroll) return;
     messagesBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status, shouldAutoScroll]);
