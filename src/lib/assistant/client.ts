@@ -87,6 +87,14 @@ export function setAssistantSettings(
 export type McpToolInfo = {
   name: string;
   description?: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  errorCodes?: string[];
+  cachePolicy?: {
+    scope: "none" | "memory" | "storage";
+    ttlMs: number;
+    note?: string;
+  };
 };
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

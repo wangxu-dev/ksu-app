@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DirectChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
 import { MessageSquareText, Plus, SendHorizontal, Settings2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,12 +13,15 @@ import {
   getAssistantSettings,
   getConversationMessages,
   listConversations,
-  replaceConversationMessages,
+  onAssistantChunk,
+  onAssistantDone,
+  onAssistantError,
   setAssistantSettings,
+  startAssistantStream,
   type AssistantConversation,
+  type AssistantMessage,
   type AssistantSettings,
 } from "@/lib/assistant/client";
-import { createAssistantAgent } from "@/lib/assistant/agent";
 
 const EMPTY_SETTINGS: AssistantSettings = {
   apiKey: "",
@@ -28,21 +29,6 @@ const EMPTY_SETTINGS: AssistantSettings = {
   baseUrl: "https://openrouter.ai/api/v1",
   systemPrompt: "",
 };
-
-type ToolActivity = {
-  name: string;
-  state: "running" | "success" | "error";
-  label: string;
-};
-
-function toolDisplayName(name: string): string {
-  if (name === "get_user_info") return "身份信息";
-  if (name === "get_personal_info") return "个人信息";
-  if (name === "get_grades") return "成绩数据";
-  if (name === "get_calendar") return "校历信息";
-  if (name === "get_current_time") return "本机时间";
-  return name;
-}
 
 export function AssistantPage() {
   return (
@@ -55,63 +41,28 @@ export function AssistantPage() {
   );
 }
 
-function extractMessageText(message: UIMessage): string {
-  return message.parts
-    .filter(isTextUIPart)
-    .map((part) => part.text)
-    .join("");
-}
-
-function extractToolActivities(message: UIMessage): ToolActivity[] {
-  return message.parts.filter(isToolUIPart).map((part) => {
-    const name = getToolName(part);
-    const display = toolDisplayName(name);
-    if (part.state === "output-available") {
-      return { name, state: "success", label: display };
-    }
-    if (part.state === "output-error") {
-      return { name, state: "error", label: display };
-    }
-    return { name, state: "running", label: display };
-  });
-}
-
-function toPersistedMessages(
-  messages: UIMessage[],
-): Array<{ role: "user" | "assistant"; content: string }> {
-  return messages
-    .filter(
-      (m): m is UIMessage & { role: "user" | "assistant" } =>
-        m.role === "user" || m.role === "assistant",
-    )
-    .map((m) => ({
-      role: m.role,
-      content: extractMessageText(m),
-    }))
-    .filter((m) => m.content.trim().length > 0);
-}
-
-function toUIMessages(
-  rows: Array<{ id: string; role: "user" | "assistant"; content: string }>,
-): UIMessage[] {
-  return rows.map((m) => ({
-    id: m.id,
-    role: m.role,
-    parts: [{ type: "text", text: m.content }],
-  }));
-}
-
 function AssistantContent() {
   const token = getSavedToken() || "";
   const [prompt, setPrompt] = useState("");
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState("");
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [settings, setSettings] = useState<AssistantSettings>(EMPTY_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const [activeStreamId, setActiveStreamId] = useState("");
+  const [pendingUserText, setPendingUserText] = useState("");
+  const [streamingAssistantText, setStreamingAssistantText] = useState("");
+  const [streamError, setStreamError] = useState<string | null>(null);
   const messagesBottomRef = useRef<HTMLDivElement | null>(null);
+  const activeConversationIdRef = useRef("");
+
+  const isStreaming = activeStreamId.length > 0;
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   async function refreshConversations() {
     const items = await listConversations();
@@ -119,48 +70,10 @@ function AssistantContent() {
     return items;
   }
 
-  const agent = useMemo(() => {
-    if (!token || !settings.apiKey) return null;
-    try {
-      return createAssistantAgent(settings, token);
-    } catch {
-      return null;
-    }
-  }, [settings, token]);
-
-  const transport = useMemo(() => {
-    if (!agent) return undefined;
-    return new DirectChatTransport({ agent });
-  }, [agent]);
-
-  const { messages, sendMessage, setMessages, status } = useChat({
-    id: activeConversationId || "assistant",
-    transport: transport as any,
-    onError: (error) => {
-      console.error("[assistant] chat error", error);
-    },
-    onFinish: async ({ messages }) => {
-      if (!activeConversationId) return;
-      await replaceConversationMessages(activeConversationId, toPersistedMessages(messages));
-      await refreshConversations();
-    },
-  });
-
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (!last) return;
-    console.debug("[assistant] state", {
-      status,
-      messageCount: messages.length,
-      lastRole: last.role,
-      parts: last.parts.map((part) => part.type),
-    });
-  }, [messages, status]);
-
-  useEffect(() => {
-    if (!shouldAutoScroll) return;
-    messagesBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, status, shouldAutoScroll]);
+  async function loadConversationMessages(conversationId: string) {
+    const rows = await getConversationMessages(conversationId);
+    setMessages(rows);
+  }
 
   useEffect(() => {
     Promise.all([refreshConversations(), getAssistantSettings()]).then(async ([items, cfg]) => {
@@ -173,37 +86,73 @@ function AssistantContent() {
       } else {
         const first = items[0];
         setActiveConversationId(first.id);
-        const rows = await getConversationMessages(first.id);
-        setMessages(toUIMessages(rows) as any);
+        await loadConversationMessages(first.id);
       }
     });
-  }, [setMessages]);
+  }, []);
+
+  useEffect(() => {
+    const offChunk = onAssistantChunk((payload) => {
+      if (!payload || payload.streamId !== activeStreamId) return;
+      setStreamingAssistantText((prev) => `${prev}${payload.delta || ""}`);
+    });
+    const offDone = onAssistantDone((payload) => {
+      if (!payload || payload.streamId !== activeStreamId) return;
+      setActiveStreamId("");
+      setPendingUserText("");
+      setStreamingAssistantText("");
+      setStreamError(null);
+      const currentConversationId = activeConversationIdRef.current;
+      if (!currentConversationId) return;
+      void Promise.all([loadConversationMessages(currentConversationId), refreshConversations()]);
+    });
+    const offError = onAssistantError((payload) => {
+      if (!payload || payload.streamId !== activeStreamId) return;
+      setActiveStreamId("");
+      setPendingUserText("");
+      setStreamingAssistantText("");
+      setStreamError(payload.error || "assistant failed");
+      const currentConversationId = activeConversationIdRef.current;
+      if (!currentConversationId) return;
+      void Promise.all([loadConversationMessages(currentConversationId), refreshConversations()]);
+    });
+
+    return () => {
+      offChunk();
+      offDone();
+      offError();
+    };
+  }, [activeStreamId]);
+
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
+    messagesBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, pendingUserText, streamingAssistantText, shouldAutoScroll]);
 
   const canSend = useMemo(
-    () =>
-      !!prompt.trim() &&
-      !!token &&
-      !!activeConversationId &&
-      !!transport &&
-      status !== "submitted" &&
-      status !== "streaming",
-    [prompt, token, activeConversationId, transport, status],
+    () => !!prompt.trim() && !!token && !!activeConversationId && !isStreaming,
+    [prompt, token, activeConversationId, isStreaming],
   );
-  const lastMessage = messages[messages.length - 1];
-  const showOptimisticAssistant = status === "submitted" && lastMessage?.role === "user";
 
   async function onNewConversation() {
+    if (isStreaming) return;
     const created = await createConversation("新对话");
     setConversations((prev) => [created, ...prev]);
     setActiveConversationId(created.id);
     setMessages([]);
+    setPendingUserText("");
+    setStreamingAssistantText("");
+    setStreamError(null);
     setShowConversations(false);
   }
 
   async function onSelectConversation(conversationId: string) {
+    if (isStreaming) return;
     setActiveConversationId(conversationId);
-    const rows = await getConversationMessages(conversationId);
-    setMessages(toUIMessages(rows) as any);
+    await loadConversationMessages(conversationId);
+    setPendingUserText("");
+    setStreamingAssistantText("");
+    setStreamError(null);
     setShowConversations(false);
   }
 
@@ -218,10 +167,20 @@ function AssistantContent() {
     if (!canSend || !text) return;
     setPrompt("");
     setShouldAutoScroll(true);
+    setPendingUserText(text);
+    setStreamingAssistantText("");
+    setStreamError(null);
     try {
-      await sendMessage({ text });
+      const { streamId } = await startAssistantStream({
+        message: text,
+        token,
+        conversationId: activeConversationId,
+      });
+      setActiveStreamId(streamId);
     } catch (error) {
-      console.error("[assistant] send message failed", error);
+      setPendingUserText("");
+      setStreamingAssistantText("");
+      setStreamError(error instanceof Error ? error.message : "发送失败");
     }
   }
 
@@ -233,7 +192,7 @@ function AssistantContent() {
           <Button variant="ghost" size="icon" onClick={() => setShowConversations((v) => !v)}>
             <MessageSquareText />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onNewConversation}>
+          <Button variant="ghost" size="icon" onClick={onNewConversation} disabled={isStreaming}>
             <Plus />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setShowSettings((v) => !v)}>
@@ -243,7 +202,6 @@ function AssistantContent() {
       </div>
 
       <div
-        ref={messagesContainerRef}
         className="min-h-0 flex-1 space-y-6 overflow-auto px-6 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -251,31 +209,21 @@ function AssistantContent() {
           setShouldAutoScroll(distanceToBottom < 80);
         }}
       >
-        {messages.length === 0 ? (
+        {messages.length === 0 && !pendingUserText && !streamingAssistantText ? (
           <p className="text-sm text-muted-foreground">输入“我是谁”或“我的成绩如何”开始。</p>
         ) : null}
-        {messages.map((m) => {
-          const content = extractMessageText(m);
-          const toolActivities = extractToolActivities(m).filter(
-            (activity) => activity.state === "running",
-          );
-          const isUser = m.role === "user";
-          const hasText = content.trim().length > 0;
-          const shouldShowWaiting =
-            !isUser && status === "streaming" && !hasText && toolActivities.length === 0;
-          const shouldShowToolRunning = !isUser && !hasText && toolActivities.length > 0;
-          const runningToolNames = toolActivities.map((activity) => activity.label).join("、");
 
+        {messages.map((m) => {
+          const isUser = m.role === "user";
+          const content = m.content || "";
           return (
             <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
               <div className="max-w-[82%] space-y-2">
                 {isUser ? (
                   <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
-                    <div className="whitespace-pre-wrap wrap-break-word">
-                      {content || "处理中（等待发送）..."}
-                    </div>
+                    <div className="whitespace-pre-wrap wrap-break-word">{content}</div>
                   </div>
-                ) : hasText ? (
+                ) : (
                   <div className="px-1 py-0.5 text-sm leading-7 text-foreground">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
@@ -295,31 +243,42 @@ function AssistantContent() {
                       {content}
                     </ReactMarkdown>
                   </div>
-                ) : null}
-
-                {shouldShowWaiting ? (
-                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                    思考中...
-                  </div>
-                ) : null}
-
-                {shouldShowToolRunning ? (
-                  <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                    {runningToolNames}
-                  </div>
-                ) : null}
+                )}
               </div>
             </div>
           );
         })}
-        {showOptimisticAssistant ? (
-          <div className="flex justify-start">
-            <div className="max-w-[82%]">
-              <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
-                思考中...
+
+        {pendingUserText ? (
+          <div className="flex justify-end">
+            <div className="max-w-[82%] space-y-2">
+              <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
+                <div className="whitespace-pre-wrap wrap-break-word">{pendingUserText}</div>
               </div>
             </div>
           </div>
+        ) : null}
+
+        {isStreaming ? (
+          <div className="flex justify-start">
+            <div className="max-w-[82%]">
+              {streamingAssistantText ? (
+                <div className="px-1 py-0.5 text-sm leading-7 text-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {streamingAssistantText}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="animate-[pulse_2.4s_ease-in-out_infinite] text-sm text-muted-foreground">
+                  思考中...
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {streamError ? (
+          <div className="text-sm text-muted-foreground">本次请求失败：{streamError}</div>
         ) : null}
         <div ref={messagesBottomRef} />
       </div>

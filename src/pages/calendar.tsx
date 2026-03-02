@@ -1,18 +1,15 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
-import { getCalendarMonthCached } from "@/lib/auth/service";
-import {
-  formatYearMonth,
-  getCachedCalendarMonth,
-  weekText,
-  type CalendarDay,
-} from "@/lib/calendar";
-import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+import { formatYearMonth, weekText } from "@/lib/calendar";
+import { getCalendarMonth } from "@/lib/api/ksu";
 
 function addMonths(date: Date, delta: number) {
   const d = new Date(date);
@@ -42,47 +39,30 @@ function CalendarContent() {
   const navigate = useNavigate();
   const [token] = useState(() => getSavedToken());
   const [cursor, setCursor] = useState(() => new Date());
-  const [days, setDays] = useState<CalendarDay[]>([]);
-  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) navigate({ to: "/login" });
   }, [token, navigate]);
 
   const yearMonth = useMemo(() => formatYearMonth(cursor), [cursor]);
+  const calendarQuery = useQuery({
+    queryKey: ["calendar", token, yearMonth],
+    enabled: !!token,
+    staleTime: KSU_CACHE_POLICY.calendar.ttlMs,
+    queryFn: async () => getCalendarMonth(String(token), yearMonth),
+  });
 
-  const load = async (force: boolean) => {
-    if (!token) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await getCalendarMonthCached(token, yearMonth, {
-        maxAgeMs: 30 * 24 * 60 * 60 * 1000,
-        force,
-      });
-      setDays(res.data);
-      setFetchedAt(res.fetchedAt);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "获取校历失败");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const cached = getCachedCalendarMonth(yearMonth);
-    if (cached) {
-      setDays(cached.data);
-      setFetchedAt(cached.fetchedAt);
-    }
-    load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, yearMonth]);
+  const days = calendarQuery.data ?? [];
+  const fetchedAt = calendarQuery.dataUpdatedAt || null;
+  const isLoading = calendarQuery.isFetching;
+  const error = calendarQuery.error
+    ? calendarQuery.error instanceof Error
+      ? calendarQuery.error.message
+      : "获取校历失败"
+    : null;
 
   const dayByDate = useMemo(() => {
-    const m = new Map<string, CalendarDay>();
+    const m = new Map<string, (typeof days)[number]>();
     for (const d of days) m.set(d.rq, d);
     return m;
   }, [days]);
@@ -90,7 +70,7 @@ function CalendarContent() {
   const grid = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-    const firstWeekday = (first.getDay() + 6) % 7; // Mon=0 ... Sun=6
+    const firstWeekday = (first.getDay() + 6) % 7;
     const cells: Array<{ date: Date; inMonth: boolean }> = [];
     for (let i = 0; i < firstWeekday; i++) {
       const d = new Date(first);
@@ -148,7 +128,7 @@ function CalendarContent() {
             variant="outline"
             size="sm"
             className="gap-2"
-            onClick={() => load(true)}
+            onClick={() => calendarQuery.refetch()}
             disabled={isLoading}
           >
             <RefreshCw aria-hidden="true" className="h-4 w-4" />

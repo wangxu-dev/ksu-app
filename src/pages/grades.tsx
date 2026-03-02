@@ -1,13 +1,15 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
-import { getGradesCached } from "@/lib/auth/service";
-import type { GradesData } from "@/lib/grades";
-import { useNavigate } from "@tanstack/react-router";
-import { RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+import { getGrades } from "@/lib/api/ksu";
+import { getCachedGrades } from "@/lib/grades";
 
 function formatDateTime(ts: number) {
   return new Date(ts).toLocaleString("zh-CN", { hour12: false });
@@ -27,10 +29,6 @@ export function GradesPage() {
 function GradesContent() {
   const navigate = useNavigate();
   const [token] = useState(() => getSavedToken());
-  const [data, setData] = useState<GradesData | null>(null);
-  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -38,25 +36,22 @@ function GradesContent() {
     }
   }, [token, navigate]);
 
-  const load = async (force: boolean) => {
-    if (!token) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await getGradesCached(token, { maxAgeMs: 7 * 24 * 60 * 60 * 1000, force });
-      setData(res.data);
-      setFetchedAt(res.fetchedAt);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "获取成绩失败");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const gradesQuery = useQuery({
+    queryKey: ["grades", token],
+    enabled: !!token,
+    staleTime: KSU_CACHE_POLICY.grades.ttlMs,
+    queryFn: async () => getGrades(String(token)),
+    initialData: getCachedGrades()?.data,
+  });
 
-  useEffect(() => {
-    load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  const data = gradesQuery.data ?? null;
+  const fetchedAt = gradesQuery.dataUpdatedAt || null;
+  const isLoading = gradesQuery.isFetching;
+  const error = gradesQuery.error
+    ? gradesQuery.error instanceof Error
+      ? gradesQuery.error.message
+      : "获取成绩失败"
+    : null;
 
   const summary = useMemo(() => {
     if (!data) return null;
@@ -81,7 +76,7 @@ function GradesContent() {
           variant="outline"
           size="sm"
           className="gap-2"
-          onClick={() => load(true)}
+          onClick={() => gradesQuery.refetch()}
           disabled={isLoading}
         >
           <RefreshCw aria-hidden="true" className="h-4 w-4" />
