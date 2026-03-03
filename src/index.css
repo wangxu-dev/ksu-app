@@ -3,8 +3,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Inter", "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  /* 规范化中文字体栈：Noto Sans SC (思源黑体) 优先 */
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", monospace;
 
   --radius-sm: 2px;
   --radius-md: 4px;
@@ -71,14 +72,12 @@
 
 .dark {
   color-scheme: dark;
-  /* 统一极深背景 */
   --background: oklch(0.12 0 0); 
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.15 0 0);
   --card-foreground: oklch(0.98 0 0);
   --popover: oklch(0.15 0 0);
   --popover-foreground: oklch(0.98 0 0);
-  /* 修正 Primary 为深色调或强调色，不再是纯白 */
   --primary: oklch(0.35 0 0); 
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.2 0 0);
@@ -91,7 +90,6 @@
   --border: oklch(0.25 0 0);
   --input: oklch(0.25 0 0);
   --ring: oklch(0.4 0 0);
-  /* 侧边栏背景与全局背景统一 */
   --sidebar: oklch(0.12 0 0);
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.35 0 0);
@@ -112,6 +110,11 @@
     display: none;
   }
   body {
-    @apply bg-background font-sans text-foreground antialiased overflow-hidden;
+    /* 强制使用思源黑体 */
+    font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    @apply bg-background text-foreground antialiased overflow-hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
   }
 }
