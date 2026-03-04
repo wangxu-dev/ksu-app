@@ -229,9 +229,11 @@ function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): Updat
       });
       return;
     }
-    setTimeout(() => {
+    const runSilentCheck = () => {
       void checkForUpdates({ silent: true });
-    }, 2_000);
+    };
+    setTimeout(runSilentCheck, 2_000);
+    setInterval(runSilentCheck, 6 * 60 * 60 * 1000);
   }
 
   return {
