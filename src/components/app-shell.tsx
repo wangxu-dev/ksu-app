@@ -3,50 +3,43 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { usePageHeader } from "@/components/page-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { UpdateAction } from "@/components/update-action";
-import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { CommandMenu } from "@/components/command-menu";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { header } = usePageHeader();
-  const { collapsed, toggle } = useSidebarCollapsed();
 
   return (
-    <div
-      className="flex h-screen w-full overflow-hidden bg-background"
-      style={
-        {
-          // Sidebar widths (tweak these two values to your preference)
-          "--sidebar-expanded": "12rem",
-          "--sidebar-collapsed": "3.5rem",
-          "--sidebar-width": collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-expanded)",
-        } as React.CSSProperties
-      }
-    >
-      <div
-        className="shrink-0 transition-[width] duration-200 ease-linear"
-        style={{ width: "var(--sidebar-width)" }}
-      >
-        <AppSidebar collapsed={collapsed} onToggleCollapsed={toggle} />
-      </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60 sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <AppTopNav />
+          </div>
+          
+          <div className="flex flex-1 items-center justify-center max-w-md mx-auto">
+            <CommandMenu />
+          </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
-          <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6">
-            <div className="min-w-0 flex-1">
-              <AppTopNav />
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <UpdateAction />
-              {header ? <div className="min-w-0">{header}</div> : null}
-              <ThemeToggle />
-            </div>
+          <div className="flex items-center gap-2">
+            <UpdateAction />
+            {header ? <div className="hidden lg:block">{header}</div> : null}
+            <ThemeToggle />
           </div>
         </header>
 
-        <main className={cn("flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8")}>
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        <main className="flex-1 min-h-0 overflow-hidden relative">
+          <div className="h-full w-full p-4 md:p-6 lg:p-8 overflow-hidden flex flex-col">
+            {children}
+          </div>
         </main>
-      </div>
-    </div>
+
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
