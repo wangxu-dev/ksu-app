@@ -134,17 +134,17 @@ export function Home() {
             </CardHeader>
             <CardContent className="flex-1 overflow-auto pt-4 pb-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <AcademicStatBlock 
-                   label="累计修读课程" 
-                   value={personal?.kcs || "0"} 
-                   unit="门" 
-                   indicatorColor="bg-primary"
+                <AcademicStatBlock
+                  label="累计修读课程"
+                  value={personal?.kcs || "0"}
+                  unit="门"
+                  indicatorColor="bg-primary"
                 />
-                <AcademicStatBlock 
-                   label="登记科研成果" 
-                   value={personal?.kycg || "0"} 
-                   unit="项" 
-                   indicatorColor="bg-chart-2"
+                <AcademicStatBlock
+                  label="登记科研成果"
+                  value={personal?.kycg || "0"}
+                  unit="项"
+                  indicatorColor="bg-chart-2"
                 />
               </div>
 
@@ -153,11 +153,11 @@ export function Home() {
                   <Sparkles className="h-3.5 w-3.5" />
                   <span className="text-xs font-bold tracking-wider">学期关键摘要</span>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-3">
-                    <SimpleBox label="应得学分" value="--" />
-                    <SimpleBox label="选修课程" value="--" />
-                    <SimpleBox label="必修课程" value="--" />
+                  <SimpleBox label="应得学分" value="--" />
+                  <SimpleBox label="选修课程" value="--" />
+                  <SimpleBox label="必修课程" value="--" />
                 </div>
               </div>
 
@@ -183,20 +183,28 @@ export function Home() {
                 </div>
                 <div className="min-w-0 space-y-0.5">
                   <h3 className="font-bold text-sm truncate text-foreground">{user?.user_name}</h3>
-                  <p className="text-[11px] font-mono text-muted-foreground truncate">{user?.username}</p>
+                  <p className="text-[11px] font-mono text-muted-foreground truncate">
+                    {user?.username}
+                  </p>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-[10px] py-0 px-2 font-semibold bg-muted/30 border-border/60">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] py-0 px-2 font-semibold bg-muted/30 border-border/60"
+                >
                   {user?.identity_type_name || "普通学生"}
                 </Badge>
-                <Badge variant="outline" className="text-[10px] py-0 px-2 font-semibold truncate max-w-35 border-border/60">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] py-0 px-2 font-semibold truncate max-w-35 border-border/60"
+                >
                   {user?.organization_name || "喀什大学"}
                 </Badge>
               </div>
             </CardContent>
           </Card>
-          
+
           <CampusNewsCard token={token} />
         </div>
       </div>
@@ -205,27 +213,27 @@ export function Home() {
 }
 
 function AcademicStatBlock({ label, value, unit, indicatorColor }: any) {
-    return (
-        <div className="flex flex-col gap-1 rounded-xl border bg-card p-4 transition-colors hover:border-primary/20 shadow-sm">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
-                <div className={cn("h-1.5 w-1.5 rounded-full", indicatorColor)} />
-                {label}
-            </div>
-            <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold tracking-tight">{value}</span>
-                <span className="text-[11px] font-semibold text-muted-foreground">{unit}</span>
-            </div>
-        </div>
-    );
+  return (
+    <div className="flex flex-col gap-1 rounded-xl border bg-card p-4 transition-colors hover:border-primary/20 shadow-sm">
+      <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
+        <div className={cn("h-1.5 w-1.5 rounded-full", indicatorColor)} />
+        {label}
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-2xl font-bold tracking-tight">{value}</span>
+        <span className="text-[11px] font-semibold text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  );
 }
 
-function SimpleBox({ label, value }: { label: string, value: string }) {
-    return (
-        <div className="rounded-lg border bg-muted/20 p-3 text-center">
-            <div className="text-[10px] font-bold text-muted-foreground/60">{label}</div>
-            <div className="mt-1 font-bold text-sm text-foreground">{value}</div>
-        </div>
-    );
+function SimpleBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3 text-center">
+      <div className="text-[10px] font-bold text-muted-foreground/60">{label}</div>
+      <div className="mt-1 font-bold text-sm text-foreground">{value}</div>
+    </div>
+  );
 }
 
 interface MetricCardProps {
@@ -315,7 +323,9 @@ function CampusNewsCard({ token }: { token: string | null }) {
               onClick={() => switchSource("latest")}
               className={cn(
                 "px-2 py-0.5 text-[9px] font-bold rounded transition-all",
-                source === "latest" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                source === "latest"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               最新
@@ -324,7 +334,9 @@ function CampusNewsCard({ token }: { token: string | null }) {
               onClick={() => switchSource("hot")}
               className={cn(
                 "px-2 py-0.5 text-[9px] font-bold rounded transition-all",
-                source === "hot" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                source === "hot"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               热门
@@ -353,7 +365,7 @@ function CampusNewsCard({ token }: { token: string | null }) {
                     {item.title}
                   </span>
                   <span className="shrink-0 text-[9px] font-mono text-muted-foreground">
-                    {item.publishedAt?.slice(5, 10).replace('-', '/')}
+                    {item.publishedAt?.slice(5, 10).replace("-", "/")}
                   </span>
                 </button>
               ))}

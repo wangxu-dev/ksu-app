@@ -71,12 +71,17 @@ function GradesContent() {
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">我的成绩单概览</h1>
             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">教务系统数据同步</span>
-                {fetchedAt && (
-                <Badge variant="outline" className="h-4 text-[9px] px-1.5 font-mono border-muted-foreground/20">
-                    同步时间：{formatDateTime(fetchedAt)}
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                教务系统数据同步
+              </span>
+              {fetchedAt && (
+                <Badge
+                  variant="outline"
+                  className="h-4 text-[9px] px-1.5 font-mono border-muted-foreground/20"
+                >
+                  同步时间：{formatDateTime(fetchedAt)}
                 </Badge>
-                )}
+              )}
             </div>
           </div>
           <Button
@@ -92,50 +97,73 @@ function GradesContent() {
         </div>
 
         {error ? (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2 text-[11px] text-destructive font-bold">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2 text-[11px] text-destructive font-bold">
             同步异常：{error}
-            </div>
+          </div>
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="平均绩点 (GPA)" value={summary?.gpa} icon={GraduationCap} color="text-primary" />
-            <StatCard title="加权平均分" value={summary?.ga} icon={Calculator} color="text-chart-2" />
-            <StatCard title="累计总学分" value={summary?.totalCredit?.toFixed(1)} icon={Award} color="text-chart-3" />
-            <StatCard title="课程总分" value={summary?.totalScore?.toFixed(0)} icon={Star} color="text-chart-4" />
+          <StatCard
+            title="平均绩点 (GPA)"
+            value={summary?.gpa}
+            icon={GraduationCap}
+            color="text-primary"
+          />
+          <StatCard title="加权平均分" value={summary?.ga} icon={Calculator} color="text-chart-2" />
+          <StatCard
+            title="累计总学分"
+            value={summary?.totalCredit?.toFixed(1)}
+            icon={Award}
+            color="text-chart-3"
+          />
+          <StatCard
+            title="课程总分"
+            value={summary?.totalScore?.toFixed(0)}
+            icon={Star}
+            color="text-chart-4"
+          />
         </div>
       </div>
 
       {/* 滚动列表区域 */}
       <div className="flex-1 min-h-0 overflow-auto pr-1">
         <div id="semesters" className="space-y-8 pb-4">
-            {data?.semesterGradeList?.map((sem) => (
+          {data?.semesterGradeList?.map((sem) => (
             <div key={sem.semester} className="space-y-3">
-                <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 py-1 backdrop-blur-sm">
-                    <h3 className="text-xs font-bold text-primary">{sem.semester}</h3>
-                    <div className="h-[1px] flex-1 bg-border/40" />
-                </div>
-                
-                <div className="grid gap-2">
+              <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 py-1 backdrop-blur-sm">
+                <h3 className="text-xs font-bold text-primary">{sem.semester}</h3>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+
+              <div className="grid gap-2">
                 {sem.gradeList.map((g) => (
-                    <div
+                  <div
                     key={g.id}
                     className="group flex items-center justify-between gap-4 rounded-xl border border-border/50 bg-card/30 p-3 transition-all hover:border-primary/30 hover:bg-card shadow-xs"
-                    >
+                  >
                     <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold text-xs group-hover:text-primary transition-colors text-foreground">{g.courseName}</div>
-                        <div className="mt-1 flex items-center gap-2">
-                            <span className="text-[9px] font-bold text-muted-foreground/60">学分：{g.credit.toFixed(1)}</span>
-                            <span className="text-[9px] font-bold text-muted-foreground/60">绩点：{g.gp.toFixed(1)}</span>
-                        </div>
+                      <div className="truncate font-semibold text-xs group-hover:text-primary transition-colors text-foreground">
+                        {g.courseName}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-[9px] font-bold text-muted-foreground/60">
+                          学分：{g.credit.toFixed(1)}
+                        </span>
+                        <span className="text-[9px] font-bold text-muted-foreground/60">
+                          绩点：{g.gp.toFixed(1)}
+                        </span>
+                      </div>
                     </div>
                     <div className="shrink-0 text-right">
-                        <div className="text-base font-bold tabular-nums tracking-tighter text-foreground">{g.scoreText}</div>
+                      <div className="text-base font-bold tabular-nums tracking-tighter text-foreground">
+                        {g.scoreText}
+                      </div>
                     </div>
-                    </div>
+                  </div>
                 ))}
-                </div>
+              </div>
             </div>
-            ))}
+          ))}
         </div>
       </div>
     </div>
@@ -150,7 +178,9 @@ function StatCard({ title, value, icon: Icon, color }: any) {
         <Icon className={cn("h-3.5 w-3.5 opacity-60", color)} />
       </CardHeader>
       <CardContent className="px-4 pb-3">
-        <div className="text-xl font-bold tracking-tighter tabular-nums text-foreground">{value ?? "--"}</div>
+        <div className="text-xl font-bold tracking-tighter tabular-nums text-foreground">
+          {value ?? "--"}
+        </div>
       </CardContent>
     </Card>
   );
