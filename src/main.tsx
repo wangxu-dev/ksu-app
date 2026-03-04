@@ -3,10 +3,10 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { createBrowserHistory, createHashHistory } from "@tanstack/history";
+import { ThemeProvider } from "next-themes";
 import "./index.css";
 import { createQueryClient } from "@/lib/query/client";
 import { startRendererRequesterBridge } from "@/lib/request/renderer-requester-bridge";
-import { initTheme } from "@/lib/theme";
 
 import { routeTree } from "./routeTree.gen";
 
@@ -21,13 +21,14 @@ declare module "@tanstack/react-router" {
   }
 }
 
-initTheme();
 startRendererRequesterBridge();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );
