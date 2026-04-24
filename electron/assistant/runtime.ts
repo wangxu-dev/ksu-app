@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions/completions.js";
 import { OpenRouter, callModel, fromChatMessages, tool } from "@openrouter/agent";
 import type { Item } from "@openrouter/agent";
@@ -90,13 +91,6 @@ type DeepSeekMessage =
       tool_call_id: string;
       content: string;
     };
-
-type DeepSeekChatCompletionResponse = {
-  choices?: Array<{
-    message?: DeepSeekAssistantMessage;
-    finish_reason?: string | null;
-  }>;
-};
 
 const logger = createLogger("assistant:runtime");
 const activeAssistantRuns = new Map<string, AbortController>();
@@ -556,6 +550,10 @@ async function runDeepSeekStream(args: {
   streamId: string;
   token: string;
 }) {
+  const client = new OpenAI({
+    apiKey: args.config.apiKey,
+    baseURL: args.config.baseUrl,
+  });
   const toolRuntime = createToolRuntime({
     assistantMessageId: args.assistantMessageId,
     callKsuEndpoint: args.callKsuEndpoint,
@@ -600,35 +598,95 @@ async function runDeepSeekStream(args: {
     if (args.abortController.signal.aborted) {
       throw new Error("aborted");
     }
-    const requestBody = {
-      model: args.config.model,
-      messages,
-      tools,
-      thinking: { type: "enabled" as const },
-      stream: false,
-    };
     logger.warn("deepseek turn request", {
       streamId: args.streamId,
       turn,
       messageCount: messages.length,
       lastMessageRole: messages.at(-1)?.role,
     });
-    const response = await fetch(`${args.config.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${args.config.apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-      signal: args.abortController.signal,
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
+    let finishReason = "";
+    let reasoningText = "";
+    let contentText = "";
+    const toolCallMap = new Map<
+      number,
+      { id: string; type: "function"; function: { name: string; arguments: string } }
+    >();
+    try {
+      const stream = (await client.chat.completions.create(
+        {
+          model: args.config.model,
+          messages: messages as ChatCompletionMessageParam[],
+          tools,
+          stream: true,
+        } as never,
+        {
+          signal: args.abortController.signal,
+        },
+      )) as unknown as AsyncIterable<{
+        choices?: Array<{
+          finish_reason?: string | null;
+          delta?: {
+            content?: string | null;
+            reasoning_content?: string | null;
+            tool_calls?: Array<{
+              index?: number;
+              id?: string;
+              type?: "function";
+              function?: { name?: string; arguments?: string };
+            }>;
+          };
+        }>;
+      }>;
+      for await (const chunk of stream) {
+        const choice = chunk.choices?.[0];
+        if (!choice) continue;
+        finishReason = choice.finish_reason || finishReason;
+        const delta = (choice.delta || {}) as {
+          content?: string | null;
+          reasoning_content?: string | null;
+          tool_calls?: Array<{
+            index?: number;
+            id?: string;
+            type?: "function";
+            function?: { name?: string; arguments?: string };
+          }>;
+        };
+        if (delta.reasoning_content) {
+          reasoningText += delta.reasoning_content;
+          emitReasoning(args.event, args.streamId, delta.reasoning_content, reasoningText);
+        }
+        if (delta.content) {
+          contentText += delta.content;
+          emitStatus(args.event, args.streamId, "streaming");
+          publishedText = publishText(
+            args.store,
+            args.assistantMessageId,
+            contentText,
+            (nextDelta, text) => emitChunk(args.event, args.streamId, nextDelta, text),
+            publishedText,
+          );
+        }
+        for (const partialToolCall of delta.tool_calls || []) {
+          const index = partialToolCall.index ?? 0;
+          const current = toolCallMap.get(index) || {
+            id: partialToolCall.id || randomUUID(),
+            type: "function" as const,
+            function: { name: "", arguments: "" },
+          };
+          if (partialToolCall.id) current.id = partialToolCall.id;
+          if (partialToolCall.function?.name) current.function.name = partialToolCall.function.name;
+          if (partialToolCall.function?.arguments) {
+            current.function.arguments += partialToolCall.function.arguments;
+          }
+          toolCallMap.set(index, current);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       logger.error("deepseek turn request failed", {
         streamId: args.streamId,
         turn,
-        status: response.status,
-        error: extractDeepSeekErrorText(errorText),
+        error: extractDeepSeekErrorText(message),
         lastAssistantHasReasoning:
           messages
             .slice()
@@ -636,36 +694,31 @@ async function runDeepSeekStream(args: {
             .find((message): message is DeepSeekAssistantMessage => message.role === "assistant")
             ?.reasoning_content?.length || 0,
       });
-      throw new Error(`${response.status} ${extractDeepSeekErrorText(errorText)}`.trim());
+      throw error;
     }
-    const payload = (await response.json()) as DeepSeekChatCompletionResponse;
-    const assistantMessage = payload.choices?.[0]?.message;
-    if (!assistantMessage) {
-      throw new Error("deepseek returned empty response");
-    }
+    const assistantMessage: DeepSeekAssistantMessage = {
+      role: "assistant",
+      content: contentText || null,
+      reasoning_content: reasoningText || null,
+      tool_calls: [...toolCallMap.values()],
+    };
     logger.warn("deepseek turn response", {
       streamId: args.streamId,
       turn,
-      finishReason: payload.choices?.[0]?.finish_reason || "",
+      finishReason,
       hasReasoning: Boolean(assistantMessage.reasoning_content),
       reasoningLength: assistantMessage.reasoning_content?.length || 0,
       toolCallCount: assistantMessage.tool_calls?.length || 0,
       contentLength: assistantMessage.content?.length || 0,
     });
 
-    if (assistantMessage.reasoning_content) {
+    if (assistantMessage.reasoning_content && reasoningText) {
       args.store.addTimelineEvent({
         conversationId: args.conversationId,
         assistantMessageId: args.assistantMessageId,
         type: "reasoning",
         text: assistantMessage.reasoning_content,
       });
-      emitReasoning(
-        args.event,
-        args.streamId,
-        assistantMessage.reasoning_content,
-        assistantMessage.reasoning_content,
-      );
     }
 
     messages.push(assistantMessage);

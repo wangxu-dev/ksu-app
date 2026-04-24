@@ -243,7 +243,9 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     SET text = ?, state = ?, output = ?, updated_at = ?
     WHERE id = ?
   `);
-  const deleteTimelineEventsStmt = db.prepare("DELETE FROM timeline_events WHERE conversation_id = ?");
+  const deleteTimelineEventsStmt = db.prepare(
+    "DELETE FROM timeline_events WHERE conversation_id = ?",
+  );
   const setSettingStmt = db.prepare(`
     INSERT INTO settings (key, value)
     VALUES (?, ?)
@@ -418,7 +420,9 @@ function createAssistantStore(userDataDir: string): AssistantStore {
   }): void {
     const current = db
       .prepare("SELECT text, state, output FROM timeline_events WHERE id = ?")
-      .get(input.id) as { text?: string; state?: string | null; output?: string | null } | undefined;
+      .get(input.id) as
+      | { text?: string; state?: string | null; output?: string | null }
+      | undefined;
     if (!current) return;
     updateTimelineEventStmt.run(
       input.text ?? current.text ?? "",
