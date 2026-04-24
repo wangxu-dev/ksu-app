@@ -20,8 +20,8 @@ function AssistantComposer({
   setPrompt,
 }: AssistantComposerProps) {
   return (
-    <div className="shrink-0 border-t bg-muted/10 p-4">
-      <div className="mx-auto flex w-full max-w-4xl items-end gap-2 rounded-xl border border-border/60 bg-background p-2 shadow-sm transition-all focus-within:border-primary/40">
+    <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
+      <div className="mx-auto flex w-full max-w-4xl items-end gap-2 rounded-2xl border border-border/40 bg-background/80 p-2 transition-all focus-within:border-primary/30">
         <Textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}

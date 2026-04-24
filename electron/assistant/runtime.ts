@@ -227,6 +227,10 @@ function buildSystemPrompt(): string {
     "你是 Ksu-App 内置助手。",
     "你只能通过 ksu_mcp 工具访问学校数据。",
     "回答要简洁、准确、可执行。",
+    "默认使用简短自然语言或短项目符号，不要输出 Markdown 表格。",
+    "不要重复字段名、标签、数值或同一句话。",
+    "对于成绩数据，优先先给结论，再按学期或课程简要补充，不要照抄原始结构。",
+    "如果信息很多，先总结最重要的 3 到 5 点。",
     `当前日期：${currentDateText()}`,
     "如果工具返回为空或失败，明确说明并建议用户重试。",
   ].join("\n");
@@ -350,12 +354,18 @@ async function runAssistantStream({
         },
       );
       let aggregated = "";
+      let lastTextDelta = "";
 
       emitStatus(event, streamId, "thinking");
 
       for await (const streamEvent of stream) {
         const textDelta = extractTextDeltaFromEvent(streamEvent);
         if (textDelta) {
+          if (textDelta === lastTextDelta && textDelta.length >= 4) {
+            logger.warn("duplicate text delta skipped", { streamId, textDelta });
+            continue;
+          }
+          lastTextDelta = textDelta;
           aggregated += textDelta;
           store.updateMessage(assistantMessageId, aggregated);
           emitStatus(event, streamId, "streaming");

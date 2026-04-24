@@ -25,12 +25,12 @@ function AssistantHistoryPanel({
   return (
     <div
       className={cn(
-        "flex w-56 shrink-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-muted/5 transition-[margin,opacity] duration-300 ease-in-out",
-        open ? "mr-4 opacity-100" : "-ml-56 opacity-0 pointer-events-none",
+        "flex w-56 shrink-0 flex-col overflow-hidden border-r border-border/20 bg-transparent transition-[margin,opacity] duration-300 ease-in-out",
+        open ? "opacity-100" : "-ml-56 opacity-0 pointer-events-none",
       )}
     >
-      <div className="flex shrink-0 items-center justify-between border-b bg-muted/10 p-2.5">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+      <div className="flex shrink-0 items-center justify-between px-3 py-3">
+        <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
           对话历史
         </span>
         <Button
@@ -44,7 +44,7 @@ function AssistantHistoryPanel({
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <div className="flex-1 space-y-0.5 overflow-auto p-1.5 [scrollbar-width:thin]">
+      <div className="flex-1 space-y-0.5 overflow-auto px-2 pb-2 [scrollbar-width:thin]">
         {conversations.length === 0 ? (
           <div className="flex h-20 flex-col items-center justify-center px-2 text-center text-[10px] text-muted-foreground opacity-50">
             <Inbox className="mb-1 h-4 w-4" />
@@ -56,10 +56,8 @@ function AssistantHistoryPanel({
               key={conversation.id}
               onClick={() => onSelectConversation(conversation.id)}
               className={cn(
-                "group flex cursor-pointer items-center gap-2 rounded-lg border border-transparent p-2 transition-all",
-                activeConversationId === conversation.id
-                  ? "border-border/20 bg-muted/50 shadow-xs"
-                  : "hover:bg-muted/30",
+                "group flex cursor-pointer items-center gap-2 rounded-xl border border-transparent p-2 transition-all",
+                activeConversationId === conversation.id ? "bg-muted/40" : "hover:bg-muted/25",
                 disabled && "pointer-events-none opacity-60",
               )}
             >

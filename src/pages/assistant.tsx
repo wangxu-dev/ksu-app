@@ -3,9 +3,7 @@ import { AssistantChatHeader } from "@/components/assistant/assistant-chat-heade
 import { AssistantComposer } from "@/components/assistant/assistant-composer";
 import { AssistantHistoryPanel } from "@/components/assistant/assistant-history-panel";
 import { AssistantMessageList } from "@/components/assistant/assistant-message-list";
-import { AssistantPageHeader } from "@/components/assistant/assistant-page-header";
 import { AssistantSettingsDialog } from "@/components/assistant/assistant-settings-dialog";
-import { AssistantStatusBar } from "@/components/assistant/assistant-status-bar";
 import { useAssistantController } from "@/lib/assistant/use-assistant-controller";
 
 export function AssistantPage() {
@@ -28,10 +26,8 @@ export function AssistantPage() {
           ?.title || "加载中...";
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
-      <AssistantPageHeader />
-
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <AssistantHistoryPanel
           activeConversationId={controller.activeConversationId}
           conversations={controller.conversations}
@@ -42,27 +38,24 @@ export function AssistantPage() {
           open={showHistory}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-card/30 transition-all duration-300">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300">
           <AssistantChatHeader
             activeTitle={activeTitle}
             onOpenSettings={() => setShowSettings(true)}
             onToggleHistory={() => setShowHistory((prev) => !prev)}
             showHistory={showHistory}
           />
-          <AssistantStatusBar
-            lastError={controller.lastError}
-            status={controller.status}
-            toolActivities={controller.toolActivities}
-          />
           <AssistantMessageList
             bottomRef={messagesBottomRef}
             canRegenerate={controller.canRegenerate}
             isBusy={controller.isBusy}
+            lastError={controller.lastError}
             lastAssistantMessageId={controller.lastAssistantMessageId}
             messages={controller.messages}
             onScrollNearBottomChange={setShouldAutoScroll}
             onRegenerate={controller.onRegenerate}
             status={controller.status}
+            toolActivities={controller.toolActivities}
           />
           <AssistantComposer
             disabled={!controller.canSend}

@@ -15,19 +15,19 @@ function AssistantChatHeader({
   showHistory,
 }: AssistantChatHeaderProps) {
   return (
-    <div className="flex shrink-0 items-center justify-between border-b bg-muted/20 px-4 py-2.5">
+    <div className="flex shrink-0 items-center justify-between px-4 py-3">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-muted-foreground"
+          className="h-8 w-8 rounded-full text-muted-foreground"
           onClick={onToggleHistory}
         >
           {showHistory ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
         <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-primary" />
-          <span className="max-w-50 truncate text-[11px] font-bold text-foreground/80">
+          <Bot className="h-4 w-4 text-foreground/70" />
+          <span className="max-w-50 truncate text-xs font-medium text-foreground/75">
             {activeTitle}
           </span>
         </div>
@@ -35,7 +35,7 @@ function AssistantChatHeader({
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-muted-foreground"
+        className="h-8 w-8 rounded-full text-muted-foreground"
         onClick={onOpenSettings}
       >
         <Settings2 className="h-3.5 w-3.5" />

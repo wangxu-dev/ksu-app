@@ -3,32 +3,66 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AssistantViewStatus, ChatMessage } from "@/lib/assistant/types";
+import { getToolDisplayName } from "@/lib/assistant/tool-display";
+import type { AssistantViewStatus, ChatMessage, ToolActivity } from "@/lib/assistant/types";
 
 type AssistantMessageListProps = {
   messages: ChatMessage[];
   canRegenerate?: boolean;
   isBusy?: boolean;
+  lastError?: string | null;
   lastAssistantMessageId?: string | null;
   onScrollNearBottomChange: (nearBottom: boolean) => void;
   onRegenerate?: () => void | Promise<void>;
   status: AssistantViewStatus;
+  toolActivities?: ToolActivity[];
   bottomRef: React.RefObject<HTMLDivElement | null>;
 };
+
+function buildInlineStatusText(
+  status: AssistantViewStatus,
+  toolActivities: ToolActivity[],
+  lastError: string | null | undefined,
+): string {
+  const latestTool =
+    [...toolActivities].reverse().find((item) => item.state === "running") ||
+    toolActivities[toolActivities.length - 1];
+
+  if (status === "submitted") return "请求已发送";
+  if (status === "thinking") {
+    if (latestTool) {
+      return `${getToolDisplayName(latestTool.name)} · ${latestTool.state === "running" ? "处理中" : "已完成"}`;
+    }
+    return "助手处理中";
+  }
+  if (status === "streaming") {
+    if (latestTool?.state === "running") {
+      return `${getToolDisplayName(latestTool.name)} · 正在整理回答`;
+    }
+    return "正在生成回答";
+  }
+  if (status === "aborted") return "已停止";
+  if (status === "error") return lastError || "请求失败";
+  return "助手处理中";
+}
 
 function AssistantMessageList({
   bottomRef,
   canRegenerate,
   isBusy,
+  lastError,
   lastAssistantMessageId,
   messages,
   onScrollNearBottomChange,
   onRegenerate,
   status,
+  toolActivities = [],
 }: AssistantMessageListProps) {
+  const inlineStatusText = buildInlineStatusText(status, toolActivities, lastError);
+
   return (
     <div
-      className="flex-1 min-h-0 space-y-6 overflow-auto px-6 py-5 [scrollbar-width:thin]"
+      className="flex-1 min-h-0 space-y-6 overflow-auto px-4 py-3 [scrollbar-width:thin] sm:px-6"
       onScroll={(event) => {
         const element = event.currentTarget;
         onScrollNearBottomChange(
@@ -37,14 +71,9 @@ function AssistantMessageList({
       }}
     >
       {messages.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center space-y-4 text-center opacity-40">
-          <Bot className="h-10 w-10 text-primary" />
-          <div className="space-y-1">
-            <p className="text-xs font-bold text-foreground">准备开始</p>
-            <p className="text-[10px] font-medium">
-              输入任何问题，我将通过主进程助手调用你的教务工具
-            </p>
-          </div>
+        <div className="flex h-full flex-col items-center justify-center space-y-3 text-center opacity-40">
+          <Bot className="h-9 w-9 text-foreground/70" />
+          <p className="text-xs font-medium text-foreground">开始对话</p>
         </div>
       ) : null}
 
@@ -78,11 +107,11 @@ function AssistantMessageList({
               )}
             >
               {isUser ? (
-                <div className="rounded-xl border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
+                <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
                   {message.content}
                 </div>
               ) : hasText ? (
-                <div className="rounded-xl border border-border/40 bg-muted/30 p-4 text-[13px] font-medium leading-relaxed text-foreground/90 shadow-xs">
+                <div className="px-1 py-1 text-[13px] font-medium leading-relaxed text-foreground/90">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -101,23 +130,22 @@ function AssistantMessageList({
                   </ReactMarkdown>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-[9px] font-bold text-primary">
+                <div className="flex items-center gap-2 px-1 text-[10px] font-medium text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span className="tracking-widest">
-                    {status === "submitted" ? "请求已发送" : "助手处理中"}
-                  </span>
+                  <span>{inlineStatusText}</span>
                 </div>
               )}
               {showRegenerate ? (
                 <div className="pt-1">
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                    size="icon"
+                    className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
                     onClick={() => void onRegenerate?.()}
+                    title="重新回答"
+                    aria-label="重新回答"
                   >
-                    <RotateCcw className="mr-1 h-3 w-3" />
-                    重新回答
+                    <RotateCcw className="h-3 w-3" />
                   </Button>
                 </div>
               ) : null}

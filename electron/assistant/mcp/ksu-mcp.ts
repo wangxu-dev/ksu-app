@@ -93,6 +93,28 @@ type KsuToolDefinition = {
   handler: RegisteredTool["handler"];
 };
 
+type GradeCourse = {
+  courseName?: unknown;
+  credit?: unknown;
+  gp?: unknown;
+  score?: unknown;
+  scoreText?: unknown;
+  semesterName?: unknown;
+};
+
+type SemesterGrade = {
+  semester?: unknown;
+  gradeList?: unknown;
+};
+
+type GradesData = {
+  totalCredit?: unknown;
+  gpa?: unknown;
+  ga?: unknown;
+  totalScore?: unknown;
+  semesterGradeList?: unknown;
+};
+
 const logger = createLogger("assistant:mcp");
 const memoryCache = new Map<
   string,
@@ -196,6 +218,90 @@ function createDefaultCacheAdapter(): ToolCacheAdapter {
     delete(cacheKey) {
       memoryCache.delete(cacheKey);
     },
+  };
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function toText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function normalizeGradeCourse(course: GradeCourse): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+
+  const courseName = toText(course.courseName);
+  const credit = toNumber(course.credit);
+  const gp = toNumber(course.gp);
+  const score = toNumber(course.score);
+  const scoreText = toText(course.scoreText);
+
+  if (courseName) normalized.courseName = courseName;
+  if (credit !== null) normalized.credit = credit;
+  if (gp !== null) normalized.gp = gp;
+  if (scoreText) normalized.scoreText = scoreText;
+  if (score !== null) normalized.score = score;
+
+  return normalized;
+}
+
+function normalizeGradesData(raw: GradesData): Record<string, unknown> {
+  const totalCredit = toNumber(raw.totalCredit);
+  const gpa = toText(raw.gpa);
+  const ga = toText(raw.ga);
+  const totalScore = toNumber(raw.totalScore);
+
+  const semesterGradeList = Array.isArray(raw.semesterGradeList)
+    ? (raw.semesterGradeList as SemesterGrade[])
+    : [];
+
+  const semesters = semesterGradeList
+    .map((semesterItem) => {
+      const semester = toText(semesterItem.semester);
+      const gradeList = Array.isArray(semesterItem.gradeList)
+        ? (semesterItem.gradeList as GradeCourse[])
+        : [];
+      const courses = gradeList
+        .map((course) => normalizeGradeCourse(course))
+        .filter((course) => Object.keys(course).length > 0);
+
+      if (!semester || courses.length === 0) return null;
+
+      return {
+        semester,
+        courseCount: courses.length,
+        courses,
+      };
+    })
+    .filter(
+      (
+        item,
+      ): item is { semester: string; courseCount: number; courses: Record<string, unknown>[] } =>
+        item !== null,
+    );
+
+  return {
+    summary: {
+      ...(gpa ? { gpa } : {}),
+      ...(ga ? { ga } : {}),
+      ...(totalCredit !== null ? { totalCredit } : {}),
+      ...(totalScore !== null ? { totalScore } : {}),
+    },
+    semesters,
   };
 }
 
@@ -316,7 +422,11 @@ function createKsuToolDefinitions({
     description: "获取成绩信息",
     input: z.object({}),
     inputSchema: { type: "object", properties: {}, required: [] },
-    outputSchema: { type: "object", nullable: false, description: "grade list and GPA summary" },
+    outputSchema: {
+      type: "object",
+      nullable: false,
+      description: "normalized grades summary and semester course list",
+    },
     errorCodes: [
       "TOKEN_REQUIRED",
       "UPSTREAM_REQUEST_FAILED",
@@ -330,7 +440,7 @@ function createKsuToolDefinitions({
       if (!raw.success || raw.code !== 200 || !raw.data) {
         throw new Error(String(raw.msg || "get_grades failed"));
       }
-      return raw.data;
+      return normalizeGradesData(raw.data as GradesData);
     },
   });
 
