@@ -56,7 +56,7 @@ export function CommandMenu({ isSidebarTrigger = false }: { isSidebarTrigger?: b
         <button
           onClick={() => setOpen(true)}
           className={cn(
-            "flex w-full items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-2.5 py-2 text-muted-foreground transition-all hover:bg-muted hover:text-foreground",
+            "flex w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-2.5 py-2 text-muted-foreground transition-all hover:bg-muted hover:text-foreground",
             isCollapsed ? "justify-center px-0 h-9" : "justify-start",
           )}
           title={messages.command.openSearchHint}
@@ -66,7 +66,7 @@ export function CommandMenu({ isSidebarTrigger = false }: { isSidebarTrigger?: b
             <span className="text-sm font-medium">{messages.command.openSearch}</span>
           )}
           {!isCollapsed && (
-            <kbd className="ml-auto pointer-events-none inline-flex h-4 select-none items-center gap-1 rounded border bg-background px-1 font-mono text-[11px] font-medium opacity-100">
+            <kbd className="ml-auto pointer-events-none inline-flex h-4 select-none items-center gap-1 rounded border bg-background px-1 font-mono text-xs font-medium opacity-100">
               K
             </kbd>
           )}

@@ -79,7 +79,7 @@ function GradesContent() {
                 {messages.grades.sync}
               </span>
               {fetchedAt && (
-                <Badge variant="outline" className="h-5 px-2 font-mono text-xs border-border/60">
+                <Badge variant="outline" className="h-5 border-border/60 px-2 font-mono text-xs">
                   {messages.grades.syncTime(formatDateTime(fetchedAt, locale))}
                 </Badge>
               )}
@@ -145,7 +145,7 @@ function GradesContent() {
                 {sem.gradeList.map((g) => (
                   <div
                     key={g.id}
-                    className="group flex items-center justify-between gap-4 rounded-xl border border-border/50 bg-card/30 p-3 transition-all hover:border-primary/30 hover:bg-card shadow-xs"
+                    className="group flex items-center justify-between gap-4 rounded-xl border border-border/40 bg-card p-3 shadow-xs transition-all hover:border-primary/40"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold text-xs group-hover:text-primary transition-colors text-foreground">
@@ -178,7 +178,7 @@ function GradesContent() {
 
 function StatCard({ title, value, icon: Icon, color }: any) {
   return (
-    <Card className="border-border/40 shadow-none overflow-hidden bg-muted/5">
+    <Card className="overflow-hidden border-border/40 bg-muted/5 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0 px-4 pt-3">
         <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
         <Icon className={cn("h-3.5 w-3.5 opacity-60", color)} />

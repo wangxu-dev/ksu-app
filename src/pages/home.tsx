@@ -121,8 +121,8 @@ export function Home() {
       {/* 主内容区域 */}
       <div className="flex-1 min-h-0 grid gap-6 md:grid-cols-12 overflow-hidden">
         <div className="md:col-span-8 flex flex-col gap-6 overflow-hidden">
-          <Card className="flex flex-col flex-1 overflow-hidden border-border/50 shadow-none">
-            <CardHeader className="shrink-0 border-b bg-muted/20 py-3">
+          <Card className="flex flex-col flex-1 overflow-hidden border-border/40 shadow-none">
+            <CardHeader className="shrink-0 border-b bg-muted/10 py-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-foreground">
                   {messages.home.academic}
@@ -168,7 +168,7 @@ export function Home() {
                 </div>
               </div>
 
-              <div className="mt-8 flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/5 p-4 text-primary">
+              <div className="mt-8 flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-primary">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
                 <div className="text-xs leading-relaxed font-medium">{messages.home.note}</div>
               </div>
@@ -177,7 +177,7 @@ export function Home() {
         </div>
 
         <div className="md:col-span-4 flex flex-col gap-6 overflow-hidden">
-          <Card className="shrink-0 border-border/50 shadow-none">
+          <Card className="shrink-0 border-border/40 shadow-none">
             <CardHeader className="py-3 bg-muted/10 border-b">
               <CardTitle className="text-sm font-semibold">{messages.home.profile}</CardTitle>
             </CardHeader>
@@ -196,7 +196,7 @@ export function Home() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge
                   variant="outline"
-                  className="bg-muted/30 border-border/60 px-2 py-0 text-xs font-medium"
+                  className="bg-muted/20 border-border/60 px-2 py-0 text-xs font-medium"
                 >
                   {user?.identity_type_name || messages.home.defaultIdentity}
                 </Badge>
@@ -251,10 +251,10 @@ interface MetricCardProps {
 
 function MetricCard({ title, value, icon, description, isLoading }: MetricCardProps) {
   return (
-    <Card className="group border-border/40 shadow-none transition-all hover:border-primary/30 bg-card">
+    <Card className="group border-border/40 bg-card shadow-none transition-all hover:border-primary/40">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 pt-3">
         <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
-        <div className="text-muted-foreground/60 group-hover:text-primary transition-colors">
+        <div className="text-muted-foreground group-hover:text-primary transition-colors">
           {icon}
         </div>
       </CardHeader>
@@ -316,11 +316,11 @@ function CampusNewsCard({ token }: { token: string | null }) {
   }
 
   return (
-    <Card className="flex-1 flex flex-col overflow-hidden border-border/50 shadow-none bg-card/50">
+    <Card className="flex-1 flex flex-col overflow-hidden border-border/40 bg-card shadow-none">
       <CardHeader className="shrink-0 border-b bg-muted/10 py-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm font-semibold">{messages.home.news}</CardTitle>
-          <div className="flex items-center bg-muted/60 p-0.5 rounded-md border border-border/40">
+          <div className="flex items-center rounded-md border border-border/40 bg-muted/20 p-0.5">
             <button
               onClick={() => switchSource("latest")}
               className={cn(

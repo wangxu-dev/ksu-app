@@ -46,6 +46,7 @@ type ToolCacheAdapter = {
 type RegisteredTool = {
   name: string;
   description: string;
+  cacheVersion?: string;
   input: z.ZodObject<z.ZodRawShape>;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
@@ -58,6 +59,7 @@ type KsuMcpRegistry = {
   listTools: () => Array<{
     name: string;
     description: string;
+    cacheVersion?: string;
     inputSchema: Record<string, unknown>;
     outputSchema: Record<string, unknown>;
     errorCodes: string[];
@@ -85,6 +87,7 @@ type KsuMcpRegistry = {
 type KsuToolDefinition = {
   name: string;
   description: string;
+  cacheVersion?: string;
   input: z.ZodObject<z.ZodRawShape>;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
@@ -186,10 +189,16 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function buildCacheKey(name: string, args: Record<string, unknown>, context: ToolContext): string {
+function buildCacheKey(
+  name: string,
+  args: Record<string, unknown>,
+  context: ToolContext,
+  cacheVersion = "v1",
+): string {
   const token = String(context.token || "").trim();
   const payload = stableStringify({
     name,
+    cacheVersion,
     args,
     tokenHash: token ? createHash("sha256").update(token).digest("hex") : "",
   });
@@ -284,7 +293,7 @@ function normalizeGradesData(raw: GradesData): Record<string, unknown> {
       return {
         semester,
         courseCount: courses.length,
-        courses,
+        courses: courses.slice(0, 12),
       };
     })
     .filter(
@@ -301,7 +310,8 @@ function normalizeGradesData(raw: GradesData): Record<string, unknown> {
       ...(totalCredit !== null ? { totalCredit } : {}),
       ...(totalScore !== null ? { totalScore } : {}),
     },
-    semesters,
+    semesterCount: semesters.length,
+    semesters: semesters.slice(0, 6),
   };
 }
 
@@ -420,6 +430,7 @@ function createKsuToolDefinitions({
   register({
     name: "get_grades",
     description: "获取成绩信息",
+    cacheVersion: "v2",
     input: z.object({}),
     inputSchema: { type: "object", properties: {}, required: [] },
     outputSchema: {
@@ -517,6 +528,7 @@ function createKsuMcpRegistry({
       const result = Array.from(tools.values()).map((t) => ({
         name: t.name,
         description: t.description,
+        cacheVersion: t.cacheVersion,
         inputSchema: t.inputSchema,
         outputSchema: t.outputSchema,
         errorCodes: t.errorCodes,
@@ -553,7 +565,7 @@ function createKsuMcpRegistry({
       }
       if (tool.cachePolicy.scope !== "none" && tool.cachePolicy.ttlMs > 0) {
         const nowTs = Date.now();
-        const cacheKey = buildCacheKey(name, parsedArgs, context);
+        const cacheKey = buildCacheKey(name, parsedArgs, context, tool.cacheVersion);
         const cached = cacheAdapter.get(cacheKey, nowTs);
         if (cached) {
           logger.debug("tool cache hit", { name, scope: tool.cachePolicy.scope });

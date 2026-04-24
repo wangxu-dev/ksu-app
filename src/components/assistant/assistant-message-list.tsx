@@ -93,7 +93,7 @@ function AssistantMessageList({
     >
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center space-y-3 text-center opacity-40">
-          <Bot className="h-9 w-9 text-foreground/70" />
+          <Bot className="h-9 w-9 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">{text.assistant.startConversation}</p>
         </div>
       ) : null}
@@ -128,7 +128,7 @@ function AssistantMessageList({
               )}
             >
               {isUser ? (
-                <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-2.5 text-sm font-medium text-foreground">
+                <div className="rounded-2xl border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-sm font-medium text-foreground">
                   {message.content}
                 </div>
               ) : hasText ? (

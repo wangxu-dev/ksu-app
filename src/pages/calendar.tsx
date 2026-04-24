@@ -169,14 +169,14 @@ function CalendarContent() {
                   className={[
                     "min-h-20 rounded-lg border bg-background p-2",
                     cell.inMonth ? "" : "opacity-50",
-                    isToday ? "border-primary ring-1 ring-primary/30" : "",
+                    isToday ? "border-primary ring-1 ring-primary/20" : "",
                     showLabel ? "bg-primary/5 dark:bg-primary/10 border-primary/20" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold tabular-nums">{cell.date.getDate()}</div>
                     {day?.zc ? (
-                      <div className="text-[10px] text-muted-foreground">{weekText(day.zc)}</div>
+                      <div className="text-xs text-muted-foreground">{weekText(day.zc)}</div>
                     ) : null}
                   </div>
                   {label ? (
