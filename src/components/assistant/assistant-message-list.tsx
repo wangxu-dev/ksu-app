@@ -1,11 +1,25 @@
-import { Bot, Loader2, RotateCcw, User as UserIcon } from "lucide-react";
+import {
+  Bot,
+  Brain,
+  Wrench,
+  Loader2,
+  RotateCcw,
+  TriangleAlert,
+  User as UserIcon,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { getToolDisplayName } from "@/lib/assistant/tool-display";
-import type { AssistantViewStatus, ChatMessage, ToolActivity } from "@/lib/assistant/types";
+import type {
+  AssistantPreResponseEvent,
+  AssistantViewStatus,
+  ChatMessage,
+  ToolActivity,
+} from "@/lib/assistant/types";
 
 type AssistantMessageListProps = {
   messages: ChatMessage[];
@@ -15,6 +29,7 @@ type AssistantMessageListProps = {
   lastAssistantMessageId?: string | null;
   onScrollNearBottomChange: (nearBottom: boolean) => void;
   onRegenerate?: () => void | Promise<void>;
+  preResponseEventsMap?: Record<string, AssistantPreResponseEvent[]>;
   status: AssistantViewStatus;
   toolActivities?: ToolActivity[];
   bottomRef: React.RefObject<HTMLDivElement | null>;
@@ -26,6 +41,7 @@ function buildInlineStatusText(
   lastError: string | null | undefined,
   text: {
     requestSubmitted: string;
+    thinking: string;
     assistantWorking: string;
     toolWorking: string;
     toolDone: string;
@@ -41,20 +57,71 @@ function buildInlineStatusText(
 
   if (status === "submitted") return text.requestSubmitted;
   if (status === "thinking") {
-    if (latestTool) {
-      return `${getToolDisplayName(latestTool.name)} · ${latestTool.state === "running" ? text.toolWorking : text.toolDone}`;
-    }
-    return text.assistantWorking;
+    if (latestTool?.state === "running") return getToolDisplayName(latestTool.name);
+    return text.thinking;
   }
   if (status === "streaming") {
     if (latestTool?.state === "running") {
-      return `${getToolDisplayName(latestTool.name)} · ${text.toolSummarizing}`;
+      return getToolDisplayName(latestTool.name);
     }
     return text.streaming;
   }
   if (status === "aborted") return text.aborted;
   if (status === "error") return lastError || text.failed;
   return text.assistantWorking;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function AssistantPreResponseTimeline({ events }: { events: AssistantPreResponseEvent[] }) {
+  const { messages } = useI18n();
+  const sortedEvents = [...events].sort((a, b) => a.createdAt - b.createdAt);
+
+  if (sortedEvents.length === 0) return null;
+
+  return (
+    <details className="group px-1 pb-1">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-[11px] font-medium text-muted-foreground marker:hidden">
+        <Brain className="h-3.5 w-3.5" />
+        <span>{messages.assistant.reasoning}</span>
+      </summary>
+      <div className="mt-2 space-y-3 pl-5">
+        {sortedEvents.map((event) =>
+          event.type === "reasoning" ? (
+            <div key={event.id} className="space-y-1">
+              <div className="whitespace-pre-wrap text-xs leading-6 text-muted-foreground/90">
+                {event.text}
+              </div>
+            </div>
+          ) : (
+            <details key={event.id} className="group space-y-1">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-[11px] font-medium text-muted-foreground marker:hidden">
+                {event.state === "running" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : event.state === "error" ? (
+                  <TriangleAlert className="h-3.5 w-3.5" />
+                ) : (
+                  <Wrench className="h-3.5 w-3.5" />
+                )}
+                <span>{getToolDisplayName(event.name)}</span>
+              </summary>
+              {event.output ? (
+                <div className="whitespace-pre-wrap break-all pl-5 text-[11px] leading-5 text-muted-foreground/75">
+                  {event.output}
+                </div>
+              ) : null}
+            </details>
+          ),
+        )}
+      </div>
+    </details>
+  );
 }
 
 function AssistantMessageList({
@@ -66,12 +133,30 @@ function AssistantMessageList({
   messages,
   onScrollNearBottomChange,
   onRegenerate,
+  preResponseEventsMap = {},
   status,
   toolActivities = [],
 }: AssistantMessageListProps) {
   const { messages: text } = useI18n();
+  const [elapsedText, setElapsedText] = useState("0s");
+  const isProcessing = status === "submitted" || status === "thinking" || status === "streaming";
+
+  useEffect(() => {
+    if (!isProcessing) {
+      setElapsedText("0s");
+      return;
+    }
+    const startedAt = Date.now();
+    setElapsedText("0s");
+    const timer = window.setInterval(() => {
+      setElapsedText(formatDuration(Date.now() - startedAt));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isProcessing]);
+
   const inlineStatusText = buildInlineStatusText(status, toolActivities, lastError, {
     requestSubmitted: text.assistant.requestSubmitted,
+    thinking: `${text.assistant.reasoning} · ${elapsedText}`,
     assistantWorking: text.assistant.assistantWorking,
     toolWorking: text.assistant.toolWorking,
     toolDone: text.assistant.toolDone,
@@ -103,6 +188,8 @@ function AssistantMessageList({
         const hasText = message.content.trim().length > 0;
         const showRegenerate =
           !isUser && !isBusy && canRegenerate && message.id === lastAssistantMessageId && hasText;
+        const timelineEvents = !isUser ? (preResponseEventsMap[message.id] ?? []) : [];
+        const showTimeline = !isUser && timelineEvents.length > 0;
 
         return (
           <div
@@ -132,28 +219,34 @@ function AssistantMessageList({
                   {message.content}
                 </div>
               ) : hasText ? (
-                <div className="px-1 py-1 text-sm font-medium leading-relaxed text-foreground">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                      ul: ({ children }) => (
-                        <ul className="mb-3 list-disc space-y-1 pl-5">{children}</ul>
-                      ),
-                      code: ({ children }) => (
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium">
-                          {children}
-                        </code>
-                      ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
+                <div className="space-y-2">
+                  {showTimeline ? <AssistantPreResponseTimeline events={timelineEvents} /> : null}
+                  <div className="px-1 py-1 text-sm font-medium leading-relaxed text-foreground">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                        ul: ({ children }) => (
+                          <ul className="mb-3 list-disc space-y-1 pl-5">{children}</ul>
+                        ),
+                        code: ({ children }) => (
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium">
+                            {children}
+                          </code>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>{inlineStatusText}</span>
+                <div className="space-y-2">
+                  {showTimeline ? <AssistantPreResponseTimeline events={timelineEvents} /> : null}
+                  <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>{inlineStatusText}</span>
+                  </div>
                 </div>
               )}
               {showRegenerate ? (

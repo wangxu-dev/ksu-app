@@ -7,6 +7,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import type { AssistantSettings } from "@/lib/assistant/types";
@@ -27,6 +34,12 @@ function AssistantSettingsDialog({
   settings,
 }: AssistantSettingsDialogProps) {
   const { messages } = useI18n();
+  const isOpenRouter = settings.activeProvider === "openrouter";
+
+  async function handleSave() {
+    await onSave();
+    onOpenChange(false);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -39,34 +52,81 @@ function AssistantSettingsDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              {messages.assistant.baseUrl}
+              {messages.assistant.provider}
             </label>
-            <Input
-              className="h-9 bg-muted/20 font-mono text-sm"
-              value={settings.baseUrl}
-              onChange={(event) => setSettings({ ...settings, baseUrl: event.target.value })}
-            />
+            <Select
+              value={settings.activeProvider}
+              onValueChange={(value) =>
+                setSettings({
+                  ...settings,
+                  activeProvider: value === "deepseek" ? "deepseek" : "openrouter",
+                })
+              }
+            >
+              <SelectTrigger className="h-9 bg-muted/20 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openrouter">{messages.assistant.openrouter}</SelectItem>
+                <SelectItem value="deepseek">{messages.assistant.deepseek}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              {messages.assistant.model}
+              {isOpenRouter ? messages.assistant.openrouter : messages.assistant.deepseek}
             </label>
-            <Input
-              className="h-9 bg-muted/20 font-mono text-sm"
-              value={settings.model}
-              onChange={(event) => setSettings({ ...settings, model: event.target.value })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {messages.assistant.apiKey}
-            </label>
-            <Input
-              type="password"
-              className="h-9 bg-muted/20 font-mono text-sm"
-              value={settings.apiKey}
-              onChange={(event) => setSettings({ ...settings, apiKey: event.target.value })}
-            />
+            <div className="space-y-3 rounded-md border border-border/60 p-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {messages.assistant.baseUrl}
+                </label>
+                <Input
+                  className="h-9 bg-muted/20 font-mono text-sm"
+                  value={isOpenRouter ? settings.openrouterBaseUrl : settings.deepseekBaseUrl}
+                  onChange={(event) =>
+                    setSettings(
+                      isOpenRouter
+                        ? { ...settings, openrouterBaseUrl: event.target.value }
+                        : { ...settings, deepseekBaseUrl: event.target.value },
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {messages.assistant.model}
+                </label>
+                <Input
+                  className="h-9 bg-muted/20 font-mono text-sm"
+                  value={isOpenRouter ? settings.openrouterModel : settings.deepseekModel}
+                  onChange={(event) =>
+                    setSettings(
+                      isOpenRouter
+                        ? { ...settings, openrouterModel: event.target.value }
+                        : { ...settings, deepseekModel: event.target.value },
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {messages.assistant.apiKey}
+                </label>
+                <Input
+                  type="password"
+                  className="h-9 bg-muted/20 font-mono text-sm"
+                  value={isOpenRouter ? settings.openrouterApiKey : settings.deepseekApiKey}
+                  onChange={(event) =>
+                    setSettings(
+                      isOpenRouter
+                        ? { ...settings, openrouterApiKey: event.target.value }
+                        : { ...settings, deepseekApiKey: event.target.value },
+                    )
+                  }
+                />
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
@@ -83,7 +143,7 @@ function AssistantSettingsDialog({
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {messages.common.cancel}
           </Button>
-          <Button size="sm" onClick={() => void onSave()}>
+          <Button size="sm" onClick={() => void handleSave()}>
             {messages.assistant.saveSettings}
           </Button>
         </DialogFooter>

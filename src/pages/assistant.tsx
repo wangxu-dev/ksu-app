@@ -56,6 +56,7 @@ export function AssistantPage() {
             messages={controller.messages}
             onScrollNearBottomChange={setShouldAutoScroll}
             onRegenerate={controller.onRegenerate}
+            preResponseEventsMap={controller.preResponseEventsMap}
             status={controller.status}
             toolActivities={controller.toolActivities}
           />

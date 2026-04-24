@@ -1,14 +1,8 @@
 import { randomUUID } from "node:crypto";
-import {
-  Agent,
-  OpenAIProvider,
-  Runner,
-  assistant,
-  isOpenAIResponsesRawModelStreamEvent,
-  tool,
-  user,
-  type RunStreamEvent,
-} from "@openai/agents";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions/completions.js";
+import { OpenRouter, callModel, fromChatMessages, tool } from "@openrouter/agent";
+import type { Item } from "@openrouter/agent";
+import type { ChatMessages as OpenRouterChatMessage } from "@openrouter/sdk/models";
 import {
   createKsuMcpRegistry,
   createKsuToolDefinitions,
@@ -17,36 +11,24 @@ import {
 import { createLogger } from "../shared/logger.js";
 import {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
-  ASSISTANT_STREAM_STATUS_CHANNEL,
-  ASSISTANT_STREAM_TOOL_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
   ASSISTANT_STREAM_ERROR_CHANNEL,
+  ASSISTANT_STREAM_REASONING_CHANNEL,
+  ASSISTANT_STREAM_STATUS_CHANNEL,
+  ASSISTANT_STREAM_TOOL_CHANNEL,
 } from "./channels.js";
 import type { IpcMainInvokeEvent } from "electron";
-import type { AssistantStore } from "./store.js";
+import type { AssistantProvider, AssistantSettings, AssistantStore } from "./store.js";
 
 type AssistantRunPayload = {
   message?: string;
   token?: string;
   conversationId?: string;
-  apiKey?: string;
-  model?: string;
-  baseUrl?: string;
-};
-
-type OpenAIConfig = {
-  apiKey: string;
-  model: string;
-  baseURL: string;
 };
 
 type StreamResult = {
   streamId: string;
-};
-
-type AssistantRuntimeContext = {
-  conversationId: string;
-  token: string;
+  assistantMessageId: string;
 };
 
 type AssistantStreamStatus =
@@ -65,6 +47,55 @@ type AssistantToolPayload = {
   name: string;
   state: AssistantToolState;
   output?: string;
+};
+
+type ProviderConfig = {
+  provider: AssistantProvider;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
+type RunDependencies = {
+  event: IpcMainInvokeEvent;
+  payload: AssistantRunPayload;
+  store: AssistantStore;
+  callKsuEndpoint: CallKsuEndpoint;
+};
+
+type DeepSeekToolCall = {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+type DeepSeekAssistantMessage = {
+  role: "assistant";
+  content?: string | null;
+  reasoning_content?: string | null;
+  tool_calls?: DeepSeekToolCall[];
+};
+
+type DeepSeekMessage =
+  | {
+      role: "system" | "user";
+      content: string;
+    }
+  | DeepSeekAssistantMessage
+  | {
+      role: "tool";
+      tool_call_id: string;
+      content: string;
+    };
+
+type DeepSeekChatCompletionResponse = {
+  choices?: Array<{
+    message?: DeepSeekAssistantMessage;
+    finish_reason?: string | null;
+  }>;
 };
 
 const logger = createLogger("assistant:runtime");
@@ -110,7 +141,6 @@ function emitChunk(
   delta: string,
   text?: string,
 ): void {
-  logger.debug("stream chunk", { streamId, chunkLength: delta.length });
   event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta, text });
 }
 
@@ -119,12 +149,19 @@ function emitStatus(
   streamId: string,
   status: AssistantStreamStatus,
 ): void {
-  logger.debug("stream status", { streamId, status });
   event.sender.send(ASSISTANT_STREAM_STATUS_CHANNEL, { streamId, status });
 }
 
+function emitReasoning(
+  event: IpcMainInvokeEvent,
+  streamId: string,
+  delta: string,
+  text: string,
+): void {
+  event.sender.send(ASSISTANT_STREAM_REASONING_CHANNEL, { streamId, delta, text });
+}
+
 function emitTool(event: IpcMainInvokeEvent, payload: AssistantToolPayload): void {
-  logger.debug("stream tool", payload);
   event.sender.send(ASSISTANT_STREAM_TOOL_CHANNEL, payload);
 }
 
@@ -134,165 +171,25 @@ function emitDone(event: IpcMainInvokeEvent, streamId: string): void {
 }
 
 function emitError(event: IpcMainInvokeEvent, streamId: string, error: unknown): void {
-  logger.error("stream error", {
-    streamId,
-    error: error instanceof Error ? error.message : String(error),
-  });
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error("stream error", { streamId, error: message });
   event.sender.send(ASSISTANT_STREAM_ERROR_CHANNEL, {
     streamId,
-    error: error instanceof Error ? error.message : "assistant failed",
+    error: message || "assistant failed",
   });
-}
-
-function normalizeTextDelta(delta: unknown): string {
-  if (typeof delta === "string") return delta;
-  if (delta instanceof Uint8Array) {
-    return new TextDecoder().decode(delta);
-  }
-  if (Array.isArray(delta) && delta.every((item) => typeof item === "number")) {
-    return new TextDecoder().decode(Uint8Array.from(delta));
-  }
-  return String(delta || "");
-}
-
-function mergeTextDelta(
-  currentText: string,
-  nextDelta: string,
-): { text: string; appended: string; deduped: boolean } {
-  if (!nextDelta) {
-    return { text: currentText, appended: "", deduped: false };
-  }
-
-  if (!currentText) {
-    return { text: nextDelta, appended: nextDelta, deduped: false };
-  }
-
-  if (currentText.endsWith(nextDelta)) {
-    return { text: currentText, appended: "", deduped: true };
-  }
-
-  const maxOverlap = Math.min(currentText.length, nextDelta.length);
-  for (let size = maxOverlap; size > 0; size -= 1) {
-    if (currentText.slice(-size) === nextDelta.slice(0, size)) {
-      const appended = nextDelta.slice(size);
-      if (!appended) {
-        return { text: currentText, appended: "", deduped: true };
-      }
-      return {
-        text: currentText + appended,
-        appended,
-        deduped: size > 0,
-      };
-    }
-  }
-
-  return {
-    text: currentText + nextDelta,
-    appended: nextDelta,
-    deduped: false,
-  };
-}
-
-function collapseAdjacentRepeats(text: string): string {
-  let result = text;
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-
-    for (let size = Math.min(24, Math.floor(result.length / 2)); size >= 1; size -= 1) {
-      let index = 0;
-      let next = "";
-
-      while (index < result.length) {
-        const chunk = result.slice(index, index + size);
-        if (
-          chunk &&
-          chunk.length === size &&
-          result.slice(index + size, index + size * 2) === chunk
-        ) {
-          next += chunk;
-          index += size * 2;
-          while (result.slice(index, index + size) === chunk) {
-            index += size;
-          }
-          changed = true;
-          continue;
-        }
-
-        next += result[index] || "";
-        index += 1;
-      }
-
-      result = next;
-    }
-  }
-
-  return result;
 }
 
 function summarizeToolOutput(output: unknown): string | undefined {
-  if (typeof output === "string") {
-    return output.slice(0, 120);
-  }
+  if (typeof output === "string") return output.slice(0, 200);
   if (output && typeof output === "object") {
     try {
-      return JSON.stringify(output).slice(0, 120);
+      return JSON.stringify(output).slice(0, 200);
     } catch {
       return undefined;
     }
   }
-  return undefined;
-}
-
-function getToolCallInfo(item: unknown): { toolCallId: string; name: string } | null {
-  if (!item || typeof item !== "object") return null;
-  const rawItem =
-    "rawItem" in item ? (item as { rawItem?: Record<string, unknown> }).rawItem : null;
-  const record =
-    rawItem && typeof rawItem === "object" ? rawItem : (item as Record<string, unknown>);
-  const toolCallId = String(record.callId || "");
-  const name = String(record.name || "");
-  if (!toolCallId || !name) return null;
-  return { toolCallId, name };
-}
-
-function getToolOutput(item: unknown): string | undefined {
-  if (!item || typeof item !== "object") return undefined;
-  if ("output" in item) {
-    return summarizeToolOutput((item as { output?: unknown }).output);
-  }
-  const rawItem =
-    "rawItem" in item ? (item as { rawItem?: Record<string, unknown> }).rawItem : null;
-  if (rawItem && typeof rawItem === "object" && "output" in rawItem) {
-    return summarizeToolOutput(rawItem.output);
-  }
-  return undefined;
-}
-
-function extractTextDeltaFromEvent(event: RunStreamEvent): string {
-  if (isOpenAIResponsesRawModelStreamEvent(event)) {
-    const providerEvent = event.data?.event as { type?: string; delta?: unknown } | undefined;
-    if (providerEvent?.type === "response.output_text.delta") {
-      return normalizeTextDelta(providerEvent.delta);
-    }
-  }
-
-  if (event.type !== "raw_model_stream_event") return "";
-
-  const rawEvent = event.data as
-    | { type?: string; delta?: unknown }
-    | { event?: { type?: string; delta?: unknown } };
-
-  if ("type" in rawEvent && rawEvent.type === "output_text_delta") {
-    return normalizeTextDelta(rawEvent.delta);
-  }
-
-  if ("event" in rawEvent && rawEvent.event?.type === "response.output_text.delta") {
-    return normalizeTextDelta(rawEvent.event.delta);
-  }
-
-  return "";
+  if (output === null || output === undefined) return undefined;
+  return String(output).slice(0, 200);
 }
 
 function currentDateText(): string {
@@ -303,220 +200,558 @@ function currentDateText(): string {
   return `${y}年${m}月${d}日`;
 }
 
-function buildSystemPrompt(): string {
-  return [
-    "你是 (喀什大学)Ksu-App 内置助手。",
-    "你能通过 ksu_mcp 工具访问学校数据。",
+function buildSystemPrompt(customPrompt: string): string {
+  const parts = [
+    "你是喀什大学 Ksu-App 内置助手。",
+    "你只能通过已注册工具访问校内数据。",
     "回答要简洁、准确、可执行。",
     "默认使用简短自然语言或短项目符号，不要输出 Markdown 表格。",
-    "不要重复字段名、标签、数值或同一句话。",
     "对于成绩数据，优先先给结论，再按学期或课程简要补充，不要照抄原始结构。",
     "如果信息很多，先总结最重要的 3 到 5 点。",
-    "不要使用夸张分析腔、模板化空话、重复修饰词，禁止输出看起来像拼接错误的重复词句。",
-    "如果用户问“成绩如何”，默认只回答 3 段：总体概览、最近学期、简短建议。",
-    "如果工具只提供结构化数据，就基于这些数据保守总结，不要臆造课程评价或能力判断。",
-    "不要使用连续星号、重复标题、伪表格或装饰性符号。",
-    `当前日期：${currentDateText()}`,
     "如果工具返回为空或失败，明确说明并建议用户重试。",
-  ].join("\n");
+    `当前日期：${currentDateText()}`,
+  ];
+  const extraPrompt = String(customPrompt || "").trim();
+  if (extraPrompt) parts.push(extraPrompt);
+  return parts.join("\n");
 }
 
-function resolveOpenAIConfig(
-  payload: AssistantRunPayload,
-  settings: ReturnType<AssistantStore["getSettings"]>,
-): OpenAIConfig {
-  const apiKey = payload?.apiKey || settings?.apiKey || process.env.OPENAI_API_KEY || "";
-  const model =
-    payload?.model || settings?.model || process.env.OPENAI_MODEL || "openai/gpt-4o-mini";
-  const baseURL =
-    payload?.baseUrl ||
-    settings?.baseUrl ||
-    process.env.OPENAI_BASE_URL ||
-    "https://openrouter.ai/api/v1";
-  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
-  return { apiKey, model, baseURL };
-}
+function toDeepSeekChatHistory(
+  store: AssistantStore,
+  conversationId: string,
+  assistantMessageId: string,
+  systemPrompt: string,
+): ChatCompletionMessageParam[] {
+  const history = store
+    .getMessages(conversationId)
+    .filter((item) => item.id !== assistantMessageId)
+    .map(
+      (item) =>
+        ({
+          role: item.role,
+          content: item.content,
+        }) satisfies ChatCompletionMessageParam,
+    );
 
-function buildConversationInput(
-  rows: Array<{ role: "user" | "assistant"; content: string }>,
-  message: string,
-) {
   return [
-    ...rows.map((item) =>
-      item.role === "assistant" ? assistant(item.content) : user(item.content),
-    ),
-    user(message),
+    {
+      role: "system",
+      content: systemPrompt,
+    },
+    ...history,
   ];
 }
 
-async function runAssistantStream({
+function toOpenRouterChatHistory(
+  store: AssistantStore,
+  conversationId: string,
+  assistantMessageId: string,
+  systemPrompt: string,
+): OpenRouterChatMessage[] {
+  return [
+    {
+      role: "system",
+      content: systemPrompt,
+    },
+    ...store
+      .getMessages(conversationId)
+      .filter((item) => item.id !== assistantMessageId)
+      .map(
+        (item) =>
+          ({
+            role: item.role,
+            content: item.content,
+          }) satisfies OpenRouterChatMessage,
+      ),
+  ];
+}
+
+function resolveProviderConfig(
+  settings: AssistantSettings,
+  provider: AssistantProvider,
+): ProviderConfig {
+  if (provider === "deepseek") {
+    return {
+      provider,
+      apiKey: settings.deepseekApiKey,
+      baseUrl: settings.deepseekBaseUrl,
+      model: settings.deepseekModel,
+    };
+  }
+
+  return {
+    provider,
+    apiKey: settings.openrouterApiKey,
+    baseUrl: settings.openrouterBaseUrl,
+    model: settings.openrouterModel,
+  };
+}
+
+function resolveRunContext(store: AssistantStore, payload: AssistantRunPayload) {
+  const conversationId = String(payload.conversationId || "").trim();
+  const token = String(payload.token || "").trim();
+  const message = String(payload.message || "").trim();
+
+  if (!conversationId) throw new Error("conversationId is required");
+  if (!token) throw new Error("token is required");
+  if (!message) throw new Error("message is required");
+
+  const conversation = store.getConversation(conversationId);
+  if (!conversation) throw new Error("conversation not found");
+
+  const settings = store.getSettings();
+  const providerConfig = resolveProviderConfig(settings, conversation.provider);
+  if (!providerConfig.apiKey.trim()) {
+    throw new Error(`${conversation.provider} api key is required`);
+  }
+  if (!providerConfig.baseUrl.trim()) {
+    throw new Error(`${conversation.provider} base url is required`);
+  }
+  if (!providerConfig.model.trim()) {
+    throw new Error(`${conversation.provider} model is required`);
+  }
+
+  return {
+    conversation,
+    conversationId,
+    message,
+    providerConfig,
+    settings,
+    token,
+  };
+}
+
+function publishText(
+  store: AssistantStore,
+  assistantMessageId: string,
+  nextText: string,
+  onPublish: (delta: string, text: string) => void,
+  currentText: string,
+): string {
+  if (nextText === currentText) return currentText;
+  const delta = nextText.startsWith(currentText) ? nextText.slice(currentText.length) : nextText;
+  store.updateMessage(assistantMessageId, nextText);
+  onPublish(delta, nextText);
+  return nextText;
+}
+
+function createToolRuntime(args: {
+  assistantMessageId: string;
+  callKsuEndpoint: CallKsuEndpoint;
+  conversationId: string;
+  event: IpcMainInvokeEvent;
+  store: AssistantStore;
+  streamId: string;
+  token: string;
+}) {
+  const cache = createAssistantToolCacheAdapter(args.store);
+  const registry = createKsuMcpRegistry({
+    callKsuEndpoint: args.callKsuEndpoint,
+    cache,
+  });
+  const definitions = createKsuToolDefinitions({
+    callKsuEndpoint: args.callKsuEndpoint,
+  });
+
+  function executeTool(name: string, input: Record<string, unknown>) {
+    const toolCallId = randomUUID();
+    args.store.addTimelineEvent({
+      id: toolCallId,
+      conversationId: args.conversationId,
+      assistantMessageId: args.assistantMessageId,
+      type: "tool",
+      toolCallId,
+      name,
+      state: "running",
+    });
+    emitTool(args.event, {
+      streamId: args.streamId,
+      toolCallId,
+      name,
+      state: "running",
+    });
+
+    return registry
+      .callTool(name, input, { token: args.token })
+      .then((output) => {
+        args.store.updateTimelineEvent({
+          id: toolCallId,
+          state: "success",
+          output: summarizeToolOutput(output) ?? null,
+        });
+        emitTool(args.event, {
+          streamId: args.streamId,
+          toolCallId,
+          name,
+          state: "success",
+          output: summarizeToolOutput(output),
+        });
+        return output;
+      })
+      .catch((error) => {
+        args.store.updateTimelineEvent({
+          id: toolCallId,
+          state: "error",
+          output: summarizeToolOutput(error instanceof Error ? error.message : error) ?? null,
+        });
+        emitTool(args.event, {
+          streamId: args.streamId,
+          toolCallId,
+          name,
+          state: "error",
+          output: summarizeToolOutput(error instanceof Error ? error.message : error),
+        });
+        throw error;
+      });
+  }
+
+  const openRouterTools = definitions.map((definition) =>
+    tool({
+      name: definition.name,
+      description: definition.description,
+      inputSchema: definition.input,
+      execute: async (input) => executeTool(definition.name, input),
+    }),
+  );
+
+  return {
+    deepSeekDefinitions: definitions,
+    executeTool,
+    openRouterTools,
+  };
+}
+
+function extractDeepSeekErrorText(errorText: string): string {
+  try {
+    const parsed = JSON.parse(errorText) as {
+      error?: { message?: string };
+      message?: string;
+    };
+    return String(parsed.error?.message || parsed.message || errorText);
+  } catch {
+    return errorText;
+  }
+}
+
+async function runOpenRouterStream(args: {
+  abortController: AbortController;
+  assistantMessageId: string;
+  callKsuEndpoint: CallKsuEndpoint;
+  config: ProviderConfig;
+  conversationId: string;
+  event: IpcMainInvokeEvent;
+  settings: AssistantSettings;
+  store: AssistantStore;
+  streamId: string;
+  token: string;
+}) {
+  const client = new OpenRouter({
+    apiKey: args.config.apiKey,
+    serverURL: args.config.baseUrl,
+  });
+  const toolRuntime = createToolRuntime({
+    assistantMessageId: args.assistantMessageId,
+    callKsuEndpoint: args.callKsuEndpoint,
+    conversationId: args.conversationId,
+    event: args.event,
+    store: args.store,
+    streamId: args.streamId,
+    token: args.token,
+  });
+  const chatMessages = toOpenRouterChatHistory(
+    args.store,
+    args.conversationId,
+    args.assistantMessageId,
+    buildSystemPrompt(args.settings.systemPrompt),
+  );
+
+  logger.warn("assistant run start", {
+    streamId: args.streamId,
+    conversationId: args.conversationId,
+    provider: args.config.provider,
+    model: args.config.model,
+    baseURL: args.config.baseUrl,
+    historyCount: Math.max(chatMessages.length - 2, 0),
+    messageLength: String(chatMessages.at(-1)?.content || "").length,
+  });
+
+  const result = callModel(
+    client,
+    {
+      model: args.config.model,
+      input: fromChatMessages(chatMessages) as Item[],
+      tools: toolRuntime.openRouterTools,
+    },
+    {
+      signal: args.abortController.signal,
+    },
+  );
+
+  let publishedText = "";
+  let reasoningText = "";
+  let reasoningEventId: string | null = null;
+  emitStatus(args.event, args.streamId, "thinking");
+  const reasoningTask = (async () => {
+    for await (const delta of result.getReasoningStream()) {
+      if (!delta) continue;
+      reasoningText += delta;
+      if (!reasoningEventId) {
+        reasoningEventId = args.store.addTimelineEvent({
+          conversationId: args.conversationId,
+          assistantMessageId: args.assistantMessageId,
+          type: "reasoning",
+          text: reasoningText,
+        });
+      } else {
+        args.store.updateTimelineEvent({
+          id: reasoningEventId,
+          text: reasoningText,
+        });
+      }
+      emitReasoning(args.event, args.streamId, delta, reasoningText);
+    }
+  })();
+  for await (const delta of result.getTextStream()) {
+    if (!delta) continue;
+    if (publishedText.length === 0) {
+      emitStatus(args.event, args.streamId, "streaming");
+    }
+    publishedText = publishText(
+      args.store,
+      args.assistantMessageId,
+      publishedText + delta,
+      (nextDelta, text) => emitChunk(args.event, args.streamId, nextDelta, text),
+      publishedText,
+    );
+  }
+
+  const finalText = await result.getText();
+  await reasoningTask;
+  if (finalText) {
+    publishedText = publishText(
+      args.store,
+      args.assistantMessageId,
+      finalText,
+      (delta, text) => emitChunk(args.event, args.streamId, delta, text),
+      publishedText,
+    );
+  }
+
+  logger.warn("assistant run summary", {
+    streamId: args.streamId,
+    provider: args.config.provider,
+    finalTextLength: publishedText.length,
+  });
+}
+
+async function runDeepSeekStream(args: {
+  abortController: AbortController;
+  assistantMessageId: string;
+  callKsuEndpoint: CallKsuEndpoint;
+  config: ProviderConfig;
+  conversationId: string;
+  event: IpcMainInvokeEvent;
+  settings: AssistantSettings;
+  store: AssistantStore;
+  streamId: string;
+  token: string;
+}) {
+  const toolRuntime = createToolRuntime({
+    assistantMessageId: args.assistantMessageId,
+    callKsuEndpoint: args.callKsuEndpoint,
+    conversationId: args.conversationId,
+    event: args.event,
+    store: args.store,
+    streamId: args.streamId,
+    token: args.token,
+  });
+  const chatMessages = toDeepSeekChatHistory(
+    args.store,
+    args.conversationId,
+    args.assistantMessageId,
+    buildSystemPrompt(args.settings.systemPrompt),
+  );
+
+  logger.warn("assistant run start", {
+    streamId: args.streamId,
+    conversationId: args.conversationId,
+    provider: args.config.provider,
+    model: args.config.model,
+    baseURL: args.config.baseUrl,
+    historyCount: Math.max(chatMessages.length - 2, 0),
+    messageLength: String(chatMessages.at(-1)?.content || "").length,
+  });
+
+  const messages: DeepSeekMessage[] = chatMessages.map((message) => ({
+    role: message.role as "system" | "user",
+    content: String(message.content || ""),
+  }));
+  const tools = toolRuntime.deepSeekDefinitions.map((definition) => ({
+    type: "function" as const,
+    function: {
+      name: definition.name,
+      description: definition.description,
+      parameters: definition.inputSchema,
+    },
+  }));
+  let publishedText = "";
+  emitStatus(args.event, args.streamId, "thinking");
+  for (let turn = 0; turn < 6; turn += 1) {
+    if (args.abortController.signal.aborted) {
+      throw new Error("aborted");
+    }
+    const requestBody = {
+      model: args.config.model,
+      messages,
+      tools,
+      thinking: { type: "enabled" as const },
+      stream: false,
+    };
+    logger.warn("deepseek turn request", {
+      streamId: args.streamId,
+      turn,
+      messageCount: messages.length,
+      lastMessageRole: messages.at(-1)?.role,
+    });
+    const response = await fetch(`${args.config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${args.config.apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: args.abortController.signal,
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("deepseek turn request failed", {
+        streamId: args.streamId,
+        turn,
+        status: response.status,
+        error: extractDeepSeekErrorText(errorText),
+        lastAssistantHasReasoning:
+          messages
+            .slice()
+            .reverse()
+            .find((message): message is DeepSeekAssistantMessage => message.role === "assistant")
+            ?.reasoning_content?.length || 0,
+      });
+      throw new Error(`${response.status} ${extractDeepSeekErrorText(errorText)}`.trim());
+    }
+    const payload = (await response.json()) as DeepSeekChatCompletionResponse;
+    const assistantMessage = payload.choices?.[0]?.message;
+    if (!assistantMessage) {
+      throw new Error("deepseek returned empty response");
+    }
+    logger.warn("deepseek turn response", {
+      streamId: args.streamId,
+      turn,
+      finishReason: payload.choices?.[0]?.finish_reason || "",
+      hasReasoning: Boolean(assistantMessage.reasoning_content),
+      reasoningLength: assistantMessage.reasoning_content?.length || 0,
+      toolCallCount: assistantMessage.tool_calls?.length || 0,
+      contentLength: assistantMessage.content?.length || 0,
+    });
+
+    if (assistantMessage.reasoning_content) {
+      args.store.addTimelineEvent({
+        conversationId: args.conversationId,
+        assistantMessageId: args.assistantMessageId,
+        type: "reasoning",
+        text: assistantMessage.reasoning_content,
+      });
+      emitReasoning(
+        args.event,
+        args.streamId,
+        assistantMessage.reasoning_content,
+        assistantMessage.reasoning_content,
+      );
+    }
+
+    messages.push(assistantMessage);
+
+    const toolCalls = assistantMessage.tool_calls || [];
+    if (toolCalls.length === 0) {
+      const finalText = String(assistantMessage.content || "");
+      if (finalText) {
+        emitStatus(args.event, args.streamId, "streaming");
+        publishedText = publishText(
+          args.store,
+          args.assistantMessageId,
+          finalText,
+          (delta, text) => emitChunk(args.event, args.streamId, delta, text),
+          publishedText,
+        );
+      }
+      logger.warn("assistant run summary", {
+        streamId: args.streamId,
+        provider: args.config.provider,
+        finalTextLength: publishedText.length,
+      });
+      return;
+    }
+
+    for (const toolCall of toolCalls) {
+      const parsedArgs = JSON.parse(toolCall.function.arguments || "{}") as Record<string, unknown>;
+      const output = await toolRuntime.executeTool(toolCall.function.name, parsedArgs);
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(output),
+      });
+    }
+  }
+  throw new Error("Max turns (6) exceeded");
+}
+
+function runAssistantStream({
   event,
   payload,
-  callKsuEndpoint,
   store,
-}: {
-  event: IpcMainInvokeEvent;
-  payload: AssistantRunPayload;
-  callKsuEndpoint: CallKsuEndpoint;
-  store: AssistantStore;
-}): Promise<StreamResult> {
+  callKsuEndpoint,
+}: RunDependencies): StreamResult {
   const streamId = randomUUID();
   const abortController = new AbortController();
-  const message = String(payload?.message || "").trim();
-  const token = String(payload?.token || "").trim();
-  const conversationId = String(payload?.conversationId || "");
+  activeAssistantRuns.set(streamId, abortController);
 
-  if (!message) {
-    logger.warn("stream invalid payload", { streamId, reason: "message is required" });
-    emitError(event, streamId, new Error("message is required"));
-    return { streamId };
-  }
-  if (!token) {
-    logger.warn("stream invalid payload", { streamId, reason: "token is required" });
-    emitError(event, streamId, new Error("token is required"));
-    return { streamId };
-  }
-  if (!conversationId) {
-    logger.warn("stream invalid payload", { streamId, reason: "conversationId is required" });
-    emitError(event, streamId, new Error("conversationId is required"));
-    return { streamId };
-  }
+  const { conversationId, message, providerConfig, settings, token } = resolveRunContext(
+    store,
+    payload,
+  );
+  store.addMessage(conversationId, "user", message);
+  const assistantMessageId = store.addMessage(conversationId, "assistant", "");
+  emitStatus(event, streamId, "submitted");
 
-  queueMicrotask(async () => {
-    activeAssistantRuns.set(streamId, abortController);
+  void (async () => {
     try {
-      emitStatus(event, streamId, "submitted");
-      const settings = store.getSettings();
-      const { apiKey, model, baseURL } = resolveOpenAIConfig(payload, settings);
-      const provider = new OpenAIProvider({
-        apiKey,
-        baseURL,
-        useResponses: true,
-      });
-      const runner = new Runner({
-        modelProvider: provider,
-        tracingDisabled: true,
-      });
-      const registry = createKsuMcpRegistry({
-        callKsuEndpoint,
-        cache: createAssistantToolCacheAdapter(store),
-      });
-      const toolDefinitions = createKsuToolDefinitions({ callKsuEndpoint });
-      const modelMessages = store
-        .getMessages(conversationId)
-        .filter(
-          (item) => (item.role === "user" || item.role === "assistant") && item.content.trim(),
-        )
-        .map((item) => ({ role: item.role, content: item.content }));
-      store.addMessage(conversationId, "user", message);
-      const assistantMessageId = store.addMessage(conversationId, "assistant", "");
-      const systemPrompt = settings.systemPrompt
-        ? `${buildSystemPrompt()}\n\n${settings.systemPrompt}`
-        : buildSystemPrompt();
-      const assistantAgent = new Agent<AssistantRuntimeContext>({
-        name: "Ksu-App Assistant",
-        instructions: systemPrompt,
-        model,
-        tools: toolDefinitions.map((definition) =>
-          tool({
-            name: definition.name,
-            description: definition.description,
-            parameters: definition.input,
-            execute: async (args) => registry.callTool(definition.name, args, { token }),
-          }),
-        ),
-      });
-      const stream = await runner.run(
-        assistantAgent,
-        buildConversationInput(modelMessages, message),
-        {
-          stream: true,
-          signal: abortController.signal,
-          context: {
-            conversationId,
-            token,
-          },
-        },
-      );
-      let aggregatedRaw = "";
-      let aggregatedDisplay = "";
-      let lastTextDelta = "";
-
-      emitStatus(event, streamId, "thinking");
-
-      for await (const streamEvent of stream) {
-        const textDelta = extractTextDeltaFromEvent(streamEvent);
-        if (textDelta) {
-          if (textDelta === lastTextDelta && textDelta.length >= 4) {
-            logger.warn("duplicate text delta skipped", { streamId, textDelta });
-            continue;
-          }
-          lastTextDelta = textDelta;
-          const merged = mergeTextDelta(aggregatedRaw, textDelta);
-          if (!merged.appended) {
-            logger.warn("overlap text delta skipped", { streamId, textDelta });
-            continue;
-          }
-          aggregatedRaw = merged.text;
-          const normalizedText = collapseAdjacentRepeats(aggregatedRaw);
-          if (normalizedText === aggregatedDisplay) {
-            logger.warn("normalized text delta skipped", { streamId, textDelta });
-            continue;
-          }
-          const uiDelta = normalizedText.startsWith(aggregatedDisplay)
-            ? normalizedText.slice(aggregatedDisplay.length)
-            : normalizedText;
-          aggregatedDisplay = normalizedText;
-          store.updateMessage(assistantMessageId, aggregatedDisplay);
-          emitStatus(event, streamId, "streaming");
-          emitChunk(event, streamId, uiDelta, aggregatedDisplay);
-        }
-
-        if (streamEvent.type === "raw_model_stream_event") {
-          continue;
-        }
-
-        if (streamEvent.type !== "run_item_stream_event") continue;
-        if (streamEvent.name === "tool_called") {
-          const info = getToolCallInfo(streamEvent.item);
-          if (!info) continue;
-          emitStatus(event, streamId, "thinking");
-          emitTool(event, {
-            streamId,
-            toolCallId: info.toolCallId,
-            name: info.name,
-            state: "running",
-          });
-          continue;
-        }
-
-        if (streamEvent.name === "tool_output") {
-          const info = getToolCallInfo(streamEvent.item);
-          if (!info) continue;
-          emitTool(event, {
-            streamId,
-            toolCallId: info.toolCallId,
-            name: info.name,
-            state: "success",
-            output: getToolOutput(streamEvent.item),
-          });
-        }
+      if (providerConfig.provider === "openrouter") {
+        await runOpenRouterStream({
+          abortController,
+          assistantMessageId,
+          callKsuEndpoint,
+          config: providerConfig,
+          conversationId,
+          event,
+          settings,
+          store,
+          streamId,
+          token,
+        });
+      } else {
+        await runDeepSeekStream({
+          abortController,
+          assistantMessageId,
+          callKsuEndpoint,
+          config: providerConfig,
+          conversationId,
+          event,
+          settings,
+          store,
+          streamId,
+          token,
+        });
       }
 
-      await stream.completed;
-      if (stream.error) {
-        throw stream.error;
-      }
-
-      if (
-        !aggregatedDisplay &&
-        typeof stream.finalOutput === "string" &&
-        stream.finalOutput.trim()
-      ) {
-        aggregatedDisplay = collapseAdjacentRepeats(stream.finalOutput.trim());
-        store.updateMessage(assistantMessageId, aggregatedDisplay);
-        emitChunk(event, streamId, aggregatedDisplay, aggregatedDisplay);
-      }
       emitStatus(event, streamId, "completed");
       emitDone(event, streamId);
     } catch (error) {
@@ -530,9 +765,9 @@ async function runAssistantStream({
     } finally {
       activeAssistantRuns.delete(streamId);
     }
-  });
+  })();
 
-  return { streamId };
+  return { streamId, assistantMessageId };
 }
 
 function abortAssistantStream(streamId: string): boolean {

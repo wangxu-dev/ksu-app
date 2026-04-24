@@ -1,5 +1,6 @@
 export const ASSISTANT_STREAM_START_CHANNEL = "assistant:stream:start";
 export const ASSISTANT_STREAM_CHUNK_CHANNEL = "assistant:stream:chunk";
+export const ASSISTANT_STREAM_REASONING_CHANNEL = "assistant:stream:reasoning";
 export const ASSISTANT_STREAM_STATUS_CHANNEL = "assistant:stream:status";
 export const ASSISTANT_STREAM_TOOL_CHANNEL = "assistant:stream:tool";
 export const ASSISTANT_STREAM_ABORT_CHANNEL = "assistant:stream:abort";
@@ -8,6 +9,7 @@ export const ASSISTANT_STREAM_ERROR_CHANNEL = "assistant:stream:error";
 export const ASSISTANT_CONVERSATION_CREATE_CHANNEL = "assistant:conversation:create";
 export const ASSISTANT_CONVERSATION_LIST_CHANNEL = "assistant:conversation:list";
 export const ASSISTANT_CONVERSATION_MESSAGES_CHANNEL = "assistant:conversation:messages";
+export const ASSISTANT_CONVERSATION_TIMELINE_CHANNEL = "assistant:conversation:timeline";
 export const ASSISTANT_CONVERSATION_DELETE_CHANNEL = "assistant:conversation:delete";
 export const ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL =
   "assistant:conversation:replace-messages";

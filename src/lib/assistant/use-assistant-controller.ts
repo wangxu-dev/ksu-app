@@ -6,15 +6,19 @@ import {
   deleteConversation,
   getAssistantSettings,
   getConversationMessages,
+  getConversationTimeline,
   listConversations,
   onAssistantChunk,
   onAssistantDone,
   onAssistantError,
+  onAssistantReasoning,
   onAssistantStatus,
   onAssistantTool,
   replaceConversationMessages,
   setAssistantSettings,
   startAssistantStream,
+  type AssistantConversation,
+  type AssistantProvider,
   type AssistantSettings,
 } from "@/lib/assistant/client";
 import {
@@ -27,16 +31,21 @@ import {
 import { getToolDisplayName } from "@/lib/assistant/tool-display";
 import {
   toChatMessages,
-  type AssistantConversation,
+  toTimelineEventMap,
+  type AssistantPreResponseEvent,
   type AssistantViewStatus,
   type ChatMessage,
   type ToolActivity,
 } from "@/lib/assistant/types";
 
 const EMPTY_SETTINGS: AssistantSettings = {
-  apiKey: "",
-  model: "openai/gpt-4o-mini",
-  baseUrl: "https://api.openai.com/v1",
+  activeProvider: "deepseek",
+  openrouterApiKey: "",
+  openrouterBaseUrl: "https://openrouter.ai/api/v1",
+  openrouterModel: "openrouter/free",
+  deepseekApiKey: "",
+  deepseekBaseUrl: "https://api.deepseek.com",
+  deepseekModel: "deepseek-v4-flash",
   systemPrompt: "",
 };
 
@@ -55,6 +64,9 @@ function useAssistantController() {
   const [settings, setSettings] = useState<AssistantSettings>(EMPTY_SETTINGS);
   const [status, setStatus] = useState<AssistantViewStatus>("idle");
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
+  const [preResponseEventsMap, setPreResponseEventsMap] = useState<
+    Record<string, AssistantPreResponseEvent[]>
+  >({});
   const [lastError, setLastError] = useState<string | null>(null);
 
   const activeStreamRef = useRef<ActiveStreamState | null>(null);
@@ -79,8 +91,12 @@ function useAssistantController() {
   }
 
   async function syncConversationMessages(conversationId: string) {
-    const rows = await getConversationMessages(conversationId);
+    const [rows, timelineRows] = await Promise.all([
+      getConversationMessages(conversationId),
+      getConversationTimeline(conversationId),
+    ]);
     setMessages(toChatMessages(rows));
+    setPreResponseEventsMap(toTimelineEventMap(timelineRows));
   }
 
   function loadDraftForConversation(conversationId: string | null) {
@@ -124,9 +140,38 @@ function useAssistantController() {
       setStatus(status);
     });
 
+    const offReasoning = onAssistantReasoning(({ streamId, text }) => {
+      const activeStream = activeStreamRef.current;
+      if (!activeStream || activeStream.streamId !== streamId) return;
+      const now = Date.now();
+      setPreResponseEventsMap((prev) => {
+        const currentEvents = prev[activeStream.assistantMessageId] || [];
+        const last = currentEvents[currentEvents.length - 1];
+        if (last?.type === "reasoning") {
+          const next = [...currentEvents];
+          next[next.length - 1] = { ...last, text, updatedAt: now };
+          return { ...prev, [activeStream.assistantMessageId]: next };
+        }
+        return {
+          ...prev,
+          [activeStream.assistantMessageId]: [
+            ...currentEvents,
+            {
+              id: `reasoning-${now}`,
+              type: "reasoning",
+              text,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        };
+      });
+    });
+
     const offTool = onAssistantTool((payload) => {
       const activeStream = activeStreamRef.current;
       if (!activeStream || activeStream.streamId !== payload.streamId) return;
+      const now = Date.now();
       setToolActivities((prev) => {
         const nextItem: ToolActivity = {
           toolCallId: payload.toolCallId,
@@ -134,12 +179,51 @@ function useAssistantController() {
           label: getToolDisplayName(payload.name),
           state: payload.state,
           output: payload.output,
+          createdAt: now,
+          updatedAt: now,
         };
         const index = prev.findIndex((item) => item.toolCallId === payload.toolCallId);
         if (index === -1) return [...prev, nextItem];
         const next = [...prev];
-        next[index] = { ...next[index], ...nextItem };
+        next[index] = { ...next[index], ...nextItem, updatedAt: now };
         return next;
+      });
+      setPreResponseEventsMap((prev) => {
+        const currentEvents = prev[activeStream.assistantMessageId] || [];
+        const index = currentEvents.findIndex(
+          (item) => item.type === "tool" && item.toolCallId === payload.toolCallId,
+        );
+        if (index === -1) {
+          return {
+            ...prev,
+            [activeStream.assistantMessageId]: [
+              ...currentEvents,
+              {
+                id: payload.toolCallId,
+                type: "tool",
+                toolCallId: payload.toolCallId,
+                name: payload.name,
+                label: getToolDisplayName(payload.name),
+                state: payload.state,
+                output: payload.output,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          };
+        }
+        const next = [...currentEvents];
+        const current = next[index];
+        if (current?.type !== "tool") return prev;
+        next[index] = {
+          ...current,
+          name: payload.name,
+          label: getToolDisplayName(payload.name),
+          state: payload.state,
+          output: payload.output,
+          updatedAt: now,
+        };
+        return { ...prev, [activeStream.assistantMessageId]: next };
       });
     });
 
@@ -174,6 +258,7 @@ function useAssistantController() {
     return () => {
       offChunk();
       offStatus();
+      offReasoning();
       offTool();
       offDone();
       offError();
@@ -183,7 +268,18 @@ function useAssistantController() {
   const isBusy = status === "submitted" || status === "thinking" || status === "streaming";
 
   const canAbort = Boolean(activeStreamRef.current);
-  const canSend = Boolean(prompt.trim() && token && settings.apiKey && !isBusy);
+
+  function getProviderApiKey(provider: AssistantProvider): string {
+    return provider === "deepseek" ? settings.deepseekApiKey : settings.openrouterApiKey;
+  }
+
+  function getConversationProvider(conversationId: string | null): AssistantProvider {
+    if (!conversationId) return settings.activeProvider;
+    return conversations.find((item) => item.id === conversationId)?.provider || "openrouter";
+  }
+
+  const currentProvider = getConversationProvider(activeConversationId);
+  const canSend = Boolean(prompt.trim() && token && getProviderApiKey(currentProvider) && !isBusy);
 
   const lastUserMessage = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -195,7 +291,10 @@ function useAssistantController() {
   }, [messages]);
 
   const canRegenerate = Boolean(
-    activeConversationId && !isBusy && lastUserMessage?.message.content.trim(),
+    activeConversationId &&
+    !isBusy &&
+    lastUserMessage?.message.content.trim() &&
+    getProviderApiKey(getConversationProvider(activeConversationId)),
   );
   const lastAssistantMessageId = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -209,6 +308,7 @@ function useAssistantController() {
     setActiveConversationId(conversationId);
     setStatus("idle");
     setToolActivities([]);
+    setPreResponseEventsMap({});
     setLastError(null);
     await syncConversationMessages(conversationId);
     loadDraftForConversation(conversationId);
@@ -219,6 +319,7 @@ function useAssistantController() {
     setActiveConversationId(null);
     setMessages([]);
     setToolActivities([]);
+    setPreResponseEventsMap({});
     setLastError(null);
     setStatus("idle");
     loadDraftForConversation(null);
@@ -246,7 +347,7 @@ function useAssistantController() {
 
   async function ensureConversation(text: string): Promise<string> {
     if (activeConversationId) return activeConversationId;
-    const created = await createConversation(text.slice(0, 20));
+    const created = await createConversation(text.slice(0, 20), settings.activeProvider);
     setActiveConversationId(created.id);
     setConversations((prev) => [created, ...prev]);
     clearDraft(null);
@@ -260,7 +361,6 @@ function useAssistantController() {
     conversationId: string;
     message: string;
   }) {
-    const assistantMessageId = `local-assistant-${Date.now()}`;
     const userMessageId = `local-user-${Date.now()}`;
     const nextMessages = input.baseMessages ?? [
       ...messages,
@@ -269,19 +369,17 @@ function useAssistantController() {
         : []),
     ];
 
-    setMessages([...nextMessages, { id: assistantMessageId, role: "assistant", content: "" }]);
     setToolActivities([]);
     setLastError(null);
     setStatus("submitted");
 
-    const { streamId } = await startAssistantStream({
+    const { assistantMessageId, streamId } = await startAssistantStream({
       message: input.message,
       token,
       conversationId: input.conversationId,
-      apiKey: settings.apiKey,
-      model: settings.model,
-      baseUrl: settings.baseUrl,
     });
+    setMessages([...nextMessages, { id: assistantMessageId, role: "assistant", content: "" }]);
+    setPreResponseEventsMap((prev) => ({ ...prev, [assistantMessageId]: [] }));
 
     activeStreamRef.current = {
       assistantMessageId,
@@ -292,7 +390,7 @@ function useAssistantController() {
 
   async function onSend() {
     const text = prompt.trim();
-    if (!text || !token || !settings.apiKey || isBusy) return;
+    if (!text || !token || !getProviderApiKey(currentProvider) || isBusy) return;
     const currentDraftScope = activeConversationId;
     const conversationId = await ensureConversation(text);
     clearDraft(currentDraftScope);
@@ -312,7 +410,14 @@ function useAssistantController() {
   }
 
   async function onRegenerate() {
-    if (!activeConversationId || !lastUserMessage || isBusy) return;
+    if (
+      !activeConversationId ||
+      !lastUserMessage ||
+      !getProviderApiKey(getConversationProvider(activeConversationId)) ||
+      isBusy
+    ) {
+      return;
+    }
     const { index, message } = lastUserMessage;
     const persistedBase = messages.slice(0, index).map((item) => ({
       role: item.role,
@@ -353,6 +458,7 @@ function useAssistantController() {
     setSettings,
     status,
     token,
+    preResponseEventsMap,
     toolActivities,
   };
 }
