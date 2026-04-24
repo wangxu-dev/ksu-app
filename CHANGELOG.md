@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Reworked assistant conversation UI into dedicated header, composer, history, message list, and settings modules.
 - Simplified assistant settings UX to show only the active provider configuration and close the dialog after saving.
 - Refined assistant process display to show reasoning and tool activity in a compact, time-ordered timeline.
+- Expanded updater mirror sources and locked each update session to a single auto-selected reachable mirror.
 
 ### Fixed
 
