@@ -1,5 +1,15 @@
 import { randomUUID } from "node:crypto";
 import {
+  Agent,
+  OpenAIProvider,
+  Runner,
+  assistant,
+  isOpenAIResponsesRawModelStreamEvent,
+  tool,
+  user,
+  type RunStreamEvent,
+} from "@openai/agents";
+import {
   createKsuMcpRegistry,
   createKsuToolDefinitions,
   type CallKsuEndpoint,
@@ -7,6 +17,8 @@ import {
 import { createLogger } from "../shared/logger.js";
 import {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
+  ASSISTANT_STREAM_STATUS_CHANNEL,
+  ASSISTANT_STREAM_TOOL_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
   ASSISTANT_STREAM_ERROR_CHANNEL,
 } from "./channels.js";
@@ -32,7 +44,31 @@ type StreamResult = {
   streamId: string;
 };
 
+type AssistantRuntimeContext = {
+  conversationId: string;
+  token: string;
+};
+
+type AssistantStreamStatus =
+  | "submitted"
+  | "thinking"
+  | "streaming"
+  | "completed"
+  | "aborted"
+  | "error";
+
+type AssistantToolState = "running" | "success" | "error";
+
+type AssistantToolPayload = {
+  streamId: string;
+  toolCallId: string;
+  name: string;
+  state: AssistantToolState;
+  output?: string;
+};
+
 const logger = createLogger("assistant:runtime");
+const activeAssistantRuns = new Map<string, AbortController>();
 
 function createAssistantToolCacheAdapter(store: AssistantStore) {
   return {
@@ -73,6 +109,20 @@ function emitChunk(event: IpcMainInvokeEvent, streamId: string, delta: string): 
   event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta });
 }
 
+function emitStatus(
+  event: IpcMainInvokeEvent,
+  streamId: string,
+  status: AssistantStreamStatus,
+): void {
+  logger.debug("stream status", { streamId, status });
+  event.sender.send(ASSISTANT_STREAM_STATUS_CHANNEL, { streamId, status });
+}
+
+function emitTool(event: IpcMainInvokeEvent, payload: AssistantToolPayload): void {
+  logger.debug("stream tool", payload);
+  event.sender.send(ASSISTANT_STREAM_TOOL_CHANNEL, payload);
+}
+
 function emitDone(event: IpcMainInvokeEvent, streamId: string): void {
   logger.info("stream done", { streamId });
   event.sender.send(ASSISTANT_STREAM_DONE_CHANNEL, { streamId });
@@ -87,6 +137,81 @@ function emitError(event: IpcMainInvokeEvent, streamId: string, error: unknown):
     streamId,
     error: error instanceof Error ? error.message : "assistant failed",
   });
+}
+
+function normalizeTextDelta(delta: unknown): string {
+  if (typeof delta === "string") return delta;
+  if (delta instanceof Uint8Array) {
+    return new TextDecoder().decode(delta);
+  }
+  if (Array.isArray(delta) && delta.every((item) => typeof item === "number")) {
+    return new TextDecoder().decode(Uint8Array.from(delta));
+  }
+  return String(delta || "");
+}
+
+function summarizeToolOutput(output: unknown): string | undefined {
+  if (typeof output === "string") {
+    return output.slice(0, 120);
+  }
+  if (output && typeof output === "object") {
+    try {
+      return JSON.stringify(output).slice(0, 120);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function getToolCallInfo(item: unknown): { toolCallId: string; name: string } | null {
+  if (!item || typeof item !== "object") return null;
+  const rawItem =
+    "rawItem" in item ? (item as { rawItem?: Record<string, unknown> }).rawItem : null;
+  const record =
+    rawItem && typeof rawItem === "object" ? rawItem : (item as Record<string, unknown>);
+  const toolCallId = String(record.callId || "");
+  const name = String(record.name || "");
+  if (!toolCallId || !name) return null;
+  return { toolCallId, name };
+}
+
+function getToolOutput(item: unknown): string | undefined {
+  if (!item || typeof item !== "object") return undefined;
+  if ("output" in item) {
+    return summarizeToolOutput((item as { output?: unknown }).output);
+  }
+  const rawItem =
+    "rawItem" in item ? (item as { rawItem?: Record<string, unknown> }).rawItem : null;
+  if (rawItem && typeof rawItem === "object" && "output" in rawItem) {
+    return summarizeToolOutput(rawItem.output);
+  }
+  return undefined;
+}
+
+function extractTextDeltaFromEvent(event: RunStreamEvent): string {
+  if (isOpenAIResponsesRawModelStreamEvent(event)) {
+    const providerEvent = event.data?.event as { type?: string; delta?: unknown } | undefined;
+    if (providerEvent?.type === "response.output_text.delta") {
+      return normalizeTextDelta(providerEvent.delta);
+    }
+  }
+
+  if (event.type !== "raw_model_stream_event") return "";
+
+  const rawEvent = event.data as
+    | { type?: string; delta?: unknown }
+    | { event?: { type?: string; delta?: unknown } };
+
+  if ("type" in rawEvent && rawEvent.type === "output_text_delta") {
+    return normalizeTextDelta(rawEvent.delta);
+  }
+
+  if ("event" in rawEvent && rawEvent.event?.type === "response.output_text.delta") {
+    return normalizeTextDelta(rawEvent.event.delta);
+  }
+
+  return "";
 }
 
 function currentDateText(): string {
@@ -123,6 +248,18 @@ function resolveOpenAIConfig(
   return { apiKey, model, baseURL };
 }
 
+function buildConversationInput(
+  rows: Array<{ role: "user" | "assistant"; content: string }>,
+  message: string,
+) {
+  return [
+    ...rows.map((item) =>
+      item.role === "assistant" ? assistant(item.content) : user(item.content),
+    ),
+    user(message),
+  ];
+}
+
 async function runAssistantStream({
   event,
   payload,
@@ -135,6 +272,7 @@ async function runAssistantStream({
   store: AssistantStore;
 }): Promise<StreamResult> {
   const streamId = randomUUID();
+  const abortController = new AbortController();
   const message = String(payload?.message || "").trim();
   const token = String(payload?.token || "").trim();
   const conversationId = String(payload?.conversationId || "");
@@ -156,13 +294,20 @@ async function runAssistantStream({
   }
 
   queueMicrotask(async () => {
+    activeAssistantRuns.set(streamId, abortController);
     try {
+      emitStatus(event, streamId, "submitted");
       const settings = store.getSettings();
       const { apiKey, model, baseURL } = resolveOpenAIConfig(payload, settings);
-      const { streamText, tool } = await import("ai");
-      const { createOpenAI } = await import("@ai-sdk/openai");
-
-      const openai = createOpenAI({ apiKey, baseURL });
+      const provider = new OpenAIProvider({
+        apiKey,
+        baseURL,
+        useResponses: true,
+      });
+      const runner = new Runner({
+        modelProvider: provider,
+        tracingDisabled: true,
+      });
       const registry = createKsuMcpRegistry({
         callKsuEndpoint,
         cache: createAssistantToolCacheAdapter(store),
@@ -179,40 +324,109 @@ async function runAssistantStream({
       const systemPrompt = settings.systemPrompt
         ? `${buildSystemPrompt()}\n\n${settings.systemPrompt}`
         : buildSystemPrompt();
-      const tools = Object.fromEntries(
-        toolDefinitions.map((definition) => [
-          definition.name,
+      const assistantAgent = new Agent<AssistantRuntimeContext>({
+        name: "Ksu-App Assistant",
+        instructions: systemPrompt,
+        model,
+        tools: toolDefinitions.map((definition) =>
           tool({
+            name: definition.name,
             description: definition.description,
-            inputSchema: definition.input,
-            execute: async (args: Record<string, unknown>) =>
-              registry.callTool(definition.name, args, { token }),
+            parameters: definition.input,
+            execute: async (args) => registry.callTool(definition.name, args, { token }),
           }),
-        ]),
-      );
-
-      const result = streamText({
-        model: openai.chat(model),
-        system: systemPrompt,
-        messages: [...modelMessages, { role: "user", content: message }],
-        tools,
+        ),
       });
+      const stream = await runner.run(
+        assistantAgent,
+        buildConversationInput(modelMessages, message),
+        {
+          stream: true,
+          signal: abortController.signal,
+          context: {
+            conversationId,
+            token,
+          },
+        },
+      );
       let aggregated = "";
 
-      for await (const delta of result.textStream) {
-        if (delta) {
-          aggregated += delta;
+      emitStatus(event, streamId, "thinking");
+
+      for await (const streamEvent of stream) {
+        const textDelta = extractTextDeltaFromEvent(streamEvent);
+        if (textDelta) {
+          aggregated += textDelta;
           store.updateMessage(assistantMessageId, aggregated);
-          emitChunk(event, streamId, delta);
+          emitStatus(event, streamId, "streaming");
+          emitChunk(event, streamId, textDelta);
+        }
+
+        if (streamEvent.type === "raw_model_stream_event") {
+          continue;
+        }
+
+        if (streamEvent.type !== "run_item_stream_event") continue;
+        if (streamEvent.name === "tool_called") {
+          const info = getToolCallInfo(streamEvent.item);
+          if (!info) continue;
+          emitStatus(event, streamId, "thinking");
+          emitTool(event, {
+            streamId,
+            toolCallId: info.toolCallId,
+            name: info.name,
+            state: "running",
+          });
+          continue;
+        }
+
+        if (streamEvent.name === "tool_output") {
+          const info = getToolCallInfo(streamEvent.item);
+          if (!info) continue;
+          emitTool(event, {
+            streamId,
+            toolCallId: info.toolCallId,
+            name: info.name,
+            state: "success",
+            output: getToolOutput(streamEvent.item),
+          });
         }
       }
+
+      await stream.completed;
+      if (stream.error) {
+        throw stream.error;
+      }
+
+      if (!aggregated && typeof stream.finalOutput === "string" && stream.finalOutput.trim()) {
+        aggregated = stream.finalOutput.trim();
+        store.updateMessage(assistantMessageId, aggregated);
+        emitChunk(event, streamId, aggregated);
+      }
+      emitStatus(event, streamId, "completed");
       emitDone(event, streamId);
     } catch (error) {
+      if (abortController.signal.aborted) {
+        emitStatus(event, streamId, "aborted");
+        emitDone(event, streamId);
+        return;
+      }
+      emitStatus(event, streamId, "error");
       emitError(event, streamId, error);
+    } finally {
+      activeAssistantRuns.delete(streamId);
     }
   });
 
   return { streamId };
 }
 
-export { runAssistantStream };
+function abortAssistantStream(streamId: string): boolean {
+  const controller = activeAssistantRuns.get(streamId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
+
+export { abortAssistantStream, runAssistantStream };
+export type { AssistantStreamStatus, AssistantToolPayload };

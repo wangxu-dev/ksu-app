@@ -2,6 +2,7 @@ import { ipcInvoke, ipcOn } from "@/lib/ipc";
 import {
   ASSISTANT_MCP_CALL_TOOL_CHANNEL,
   ASSISTANT_MCP_LIST_TOOLS_CHANNEL,
+  ASSISTANT_STREAM_ABORT_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_DELETE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
@@ -10,6 +11,8 @@ import {
   ASSISTANT_SETTINGS_GET_CHANNEL,
   ASSISTANT_SETTINGS_SET_CHANNEL,
   ASSISTANT_STREAM_CHUNK_CHANNEL,
+  ASSISTANT_STREAM_STATUS_CHANNEL,
+  ASSISTANT_STREAM_TOOL_CHANNEL,
   ASSISTANT_STREAM_DONE_CHANNEL,
   ASSISTANT_STREAM_ERROR_CHANNEL,
   ASSISTANT_STREAM_START_CHANNEL,
@@ -28,6 +31,10 @@ type StartResponse = { streamId: string };
 
 export async function startAssistantStream(payload: StartPayload): Promise<StartResponse> {
   return ipcInvoke<StartResponse>(ASSISTANT_STREAM_START_CHANNEL, payload);
+}
+
+export async function abortAssistantStream(streamId: string): Promise<{ ok: boolean }> {
+  return ipcInvoke<{ ok: boolean }>(ASSISTANT_STREAM_ABORT_CHANNEL, { streamId });
 }
 
 export type AssistantConversation = {
@@ -51,6 +58,22 @@ export type AssistantSettings = {
   model: string;
   baseUrl: string;
   systemPrompt: string;
+};
+
+export type AssistantStreamStatus =
+  | "submitted"
+  | "thinking"
+  | "streaming"
+  | "completed"
+  | "aborted"
+  | "error";
+
+export type AssistantToolEvent = {
+  streamId: string;
+  toolCallId: string;
+  name: string;
+  state: "running" | "success" | "error";
+  output?: string;
 };
 
 export function listConversations(): Promise<AssistantConversation[]> {
@@ -152,6 +175,18 @@ export function onAssistantChunk(
   return ipcOn(ASSISTANT_STREAM_CHUNK_CHANNEL, (payload) =>
     listener(payload as { streamId: string; delta: string }),
   );
+}
+
+export function onAssistantStatus(
+  listener: (payload: { streamId: string; status: AssistantStreamStatus }) => void,
+): () => void {
+  return ipcOn(ASSISTANT_STREAM_STATUS_CHANNEL, (payload) =>
+    listener(payload as { streamId: string; status: AssistantStreamStatus }),
+  );
+}
+
+export function onAssistantTool(listener: (payload: AssistantToolEvent) => void): () => void {
+  return ipcOn(ASSISTANT_STREAM_TOOL_CHANNEL, (payload) => listener(payload as AssistantToolEvent));
 }
 
 export function onAssistantDone(listener: (payload: { streamId: string }) => void): () => void {

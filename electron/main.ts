@@ -6,7 +6,7 @@ import { createLogger } from "./shared/logger.js";
 import { login } from "./auth/login.js";
 import { buildKsuRequest, type KsuRequestPayload } from "./ksu/request-builder.js";
 import { dispatchRequest } from "./request/dispatcher.js";
-import { runAssistantStream } from "./assistant/runtime.js";
+import { abortAssistantStream, runAssistantStream } from "./assistant/runtime.js";
 import { createAssistantStore } from "./assistant/store.js";
 import { createKsuMcpRegistry } from "./assistant/mcp/ksu-mcp.js";
 import { createUpdateManager } from "./updater/manager.js";
@@ -24,6 +24,7 @@ import {
 } from "./request/channels.js";
 import {
   ASSISTANT_STREAM_START_CHANNEL,
+  ASSISTANT_STREAM_ABORT_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
@@ -394,6 +395,11 @@ app.whenReady().then(() => {
       store: assistantStore,
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
+  });
+  ipcMain.handle(ASSISTANT_STREAM_ABORT_CHANNEL, async (_event, payload: unknown) => {
+    const safePayload = (payload || {}) as { streamId?: string };
+    const streamId = String(safePayload.streamId || "");
+    return { ok: abortAssistantStream(streamId) };
   });
   ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload: unknown) =>
     assistantStore.createConversation((payload as { title?: string } | undefined)?.title),

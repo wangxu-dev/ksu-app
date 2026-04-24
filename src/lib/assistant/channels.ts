@@ -1,5 +1,8 @@
 export const ASSISTANT_STREAM_START_CHANNEL = "assistant:stream:start";
 export const ASSISTANT_STREAM_CHUNK_CHANNEL = "assistant:stream:chunk";
+export const ASSISTANT_STREAM_STATUS_CHANNEL = "assistant:stream:status";
+export const ASSISTANT_STREAM_TOOL_CHANNEL = "assistant:stream:tool";
+export const ASSISTANT_STREAM_ABORT_CHANNEL = "assistant:stream:abort";
 export const ASSISTANT_STREAM_DONE_CHANNEL = "assistant:stream:done";
 export const ASSISTANT_STREAM_ERROR_CHANNEL = "assistant:stream:error";
 export const ASSISTANT_CONVERSATION_CREATE_CHANNEL = "assistant:conversation:create";
