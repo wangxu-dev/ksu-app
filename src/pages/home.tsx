@@ -27,12 +27,14 @@ import {
 } from "@/lib/api/ksu";
 import { toUserMessage } from "@/lib/errors/user-message";
 import { getCachedGrades } from "@/lib/grades";
+import { useI18n } from "@/lib/i18n";
 import { getCachedPersonalInfo } from "@/lib/personal";
 import { ipcInvoke } from "@/lib/ipc";
 import { NEWS_OPEN_CHANNEL } from "@/lib/request/channels";
 import { cn } from "@/lib/utils";
 
 function useDashboardData() {
+  const { messages } = useI18n();
   const [token] = useState(() => getSavedToken());
   const yearMonth = useMemo(() => formatYearMonth(new Date()), []);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -68,12 +70,13 @@ function useDashboardData() {
     personal: personalQuery.data ?? null,
     gpa: gradesQuery.data?.gpa ?? null,
     week: day ? weekText(day.zc) : null,
-    error: personalQuery.error ? toUserMessage(personalQuery.error, "数据同步异常") : null,
+    error: personalQuery.error ? toUserMessage(personalQuery.error, messages.home.syncError) : null,
   };
 }
 
 export function Home() {
   const navigate = useNavigate();
+  const { messages } = useI18n();
   const user = getSavedUser();
   const { token, personal, gpa, week, isLoading } = useDashboardData();
 
@@ -86,31 +89,31 @@ export function Home() {
       {/* 顶部统计卡片 */}
       <section className="grid shrink-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="平均绩点"
+          title={messages.home.gpa}
           value={gpa}
           icon={<GraduationCap className="h-4 w-4" />}
-          description="教务系统上一学期存档"
+          description={messages.home.gpaDesc}
           isLoading={isLoading}
         />
         <MetricCard
-          title="卡片余额"
+          title={messages.home.balance}
           value={personal?.xykye ? `¥${Number(personal.xykye).toFixed(2)}` : null}
           icon={<Wallet className="h-4 w-4" />}
-          description="一卡通实时账户余额"
+          description={messages.home.balanceDesc}
           isLoading={isLoading}
         />
         <MetricCard
-          title="教学周次"
+          title={messages.home.week}
           value={week}
           icon={<CalendarDays className="h-4 w-4" />}
-          description="当前校历运行进度"
+          description={messages.home.weekDesc}
           isLoading={isLoading}
         />
         <MetricCard
-          title="图书借阅"
+          title={messages.home.library}
           value={personal?.tszj ?? null}
           icon={<LibraryBig className="h-4 w-4" />}
-          description={`累计借阅 ${personal?.tsyj || 0} 本`}
+          description={messages.home.libraryDesc(personal?.tsyj || 0)}
           isLoading={isLoading}
         />
       </section>
@@ -118,30 +121,32 @@ export function Home() {
       {/* 主内容区域 */}
       <div className="flex-1 min-h-0 grid gap-6 md:grid-cols-12 overflow-hidden">
         <div className="md:col-span-8 flex flex-col gap-6 overflow-hidden">
-          <Card className="flex flex-col flex-1 overflow-hidden border-border/50 shadow-none">
-            <CardHeader className="shrink-0 border-b bg-muted/20 py-3">
+          <Card className="flex flex-col flex-1 overflow-hidden border-border/40 shadow-none">
+            <CardHeader className="shrink-0 border-b bg-muted/10 py-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold text-foreground/80">学业数据动态</CardTitle>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  {messages.home.academic}
+                </CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-8 text-xs font-semibold hover:bg-background"
                   onClick={() => navigate({ to: "/grades" })}
                 >
-                  成绩单详情 <ArrowUpRight className="ml-1 h-3 w-3" />
+                  {messages.home.gradesDetail} <ArrowUpRight className="ml-1 h-3 w-3" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto pt-4 pb-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <AcademicStatBlock
-                  label="累计修读课程"
+                  label={messages.home.courses}
                   value={personal?.kcs || "0"}
                   unit="门"
                   indicatorColor="bg-primary"
                 />
                 <AcademicStatBlock
-                  label="登记科研成果"
+                  label={messages.home.achievements}
                   value={personal?.kycg || "0"}
                   unit="项"
                   indicatorColor="bg-chart-2"
@@ -151,30 +156,30 @@ export function Home() {
               <div className="mt-8 space-y-4">
                 <div className="flex items-center gap-2 px-1 text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span className="text-xs font-bold tracking-wider">学期关键摘要</span>
+                  <span className="text-xs font-semibold tracking-wide">
+                    {messages.home.termSummary}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <SimpleBox label="应得学分" value="--" />
-                  <SimpleBox label="选修课程" value="--" />
-                  <SimpleBox label="必修课程" value="--" />
+                  <SimpleBox label={messages.home.creditsEarned} value="--" />
+                  <SimpleBox label={messages.home.electiveCourses} value="--" />
+                  <SimpleBox label={messages.home.requiredCourses} value="--" />
                 </div>
               </div>
 
-              <div className="mt-8 flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/5 p-4 text-primary">
+              <div className="mt-8 flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-primary">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                <div className="text-xs leading-relaxed font-medium">
-                  数据均同步自校务系统存档，仅供参考。如有异议，请以学校教务处发布的官方纸质报表为准。
-                </div>
+                <div className="text-xs leading-relaxed font-medium">{messages.home.note}</div>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="md:col-span-4 flex flex-col gap-6 overflow-hidden">
-          <Card className="shrink-0 border-border/50 shadow-none">
+          <Card className="shrink-0 border-border/40 shadow-none">
             <CardHeader className="py-3 bg-muted/10 border-b">
-              <CardTitle className="text-sm font-bold">学生档案</CardTitle>
+              <CardTitle className="text-sm font-semibold">{messages.home.profile}</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="flex items-center gap-4">
@@ -183,7 +188,7 @@ export function Home() {
                 </div>
                 <div className="min-w-0 space-y-0.5">
                   <h3 className="font-bold text-sm truncate text-foreground">{user?.user_name}</h3>
-                  <p className="text-[11px] font-mono text-muted-foreground truncate">
+                  <p className="text-xs font-mono text-muted-foreground truncate">
                     {user?.username}
                   </p>
                 </div>
@@ -191,15 +196,15 @@ export function Home() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge
                   variant="outline"
-                  className="text-[10px] py-0 px-2 font-semibold bg-muted/30 border-border/60"
+                  className="bg-muted/20 border-border/60 px-2 py-0 text-xs font-medium"
                 >
-                  {user?.identity_type_name || "普通学生"}
+                  {user?.identity_type_name || messages.home.defaultIdentity}
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="text-[10px] py-0 px-2 font-semibold truncate max-w-35 border-border/60"
+                  className="max-w-35 truncate border-border/60 px-2 py-0 text-xs font-medium"
                 >
-                  {user?.organization_name || "喀什大学"}
+                  {user?.organization_name || messages.home.defaultOrg}
                 </Badge>
               </div>
             </CardContent>
@@ -215,13 +220,13 @@ export function Home() {
 function AcademicStatBlock({ label, value, unit, indicatorColor }: any) {
   return (
     <div className="flex flex-col gap-1 rounded-xl border bg-card p-4 transition-colors hover:border-primary/20 shadow-sm">
-      <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <div className={cn("h-1.5 w-1.5 rounded-full", indicatorColor)} />
         {label}
       </div>
       <div className="flex items-baseline gap-1.5">
         <span className="text-2xl font-bold tracking-tight">{value}</span>
-        <span className="text-[11px] font-semibold text-muted-foreground">{unit}</span>
+        <span className="text-xs font-medium text-muted-foreground">{unit}</span>
       </div>
     </div>
   );
@@ -230,7 +235,7 @@ function AcademicStatBlock({ label, value, unit, indicatorColor }: any) {
 function SimpleBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3 text-center">
-      <div className="text-[10px] font-bold text-muted-foreground/60">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="mt-1 font-bold text-sm text-foreground">{value}</div>
     </div>
   );
@@ -246,12 +251,10 @@ interface MetricCardProps {
 
 function MetricCard({ title, value, icon, description, isLoading }: MetricCardProps) {
   return (
-    <Card className="group border-border/40 shadow-none transition-all hover:border-primary/30 bg-card">
+    <Card className="group border-border/40 bg-card shadow-none transition-all hover:border-primary/40">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 pt-3">
-        <CardTitle className="text-[11px] font-bold text-muted-foreground tracking-wider">
-          {title}
-        </CardTitle>
-        <div className="text-muted-foreground/60 group-hover:text-primary transition-colors">
+        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="text-muted-foreground group-hover:text-primary transition-colors">
           {icon}
         </div>
       </CardHeader>
@@ -263,15 +266,14 @@ function MetricCard({ title, value, icon, description, isLoading }: MetricCardPr
             {value || "--"}
           </div>
         )}
-        <p className="text-[10px] text-muted-foreground/70 mt-1 font-medium italic">
-          {description}
-        </p>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
 }
 
 function CampusNewsCard({ token }: { token: string | null }) {
+  const { messages } = useI18n();
   const [source, setSource] = useState<CampusNewsSource>("latest");
   const [pageNo, setPageNo] = useState(1);
   const pageSize = 5;
@@ -314,32 +316,32 @@ function CampusNewsCard({ token }: { token: string | null }) {
   }
 
   return (
-    <Card className="flex-1 flex flex-col overflow-hidden border-border/50 shadow-none bg-card/50">
+    <Card className="flex-1 flex flex-col overflow-hidden border-border/40 bg-card shadow-none">
       <CardHeader className="shrink-0 border-b bg-muted/10 py-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm font-bold">校园公告与新闻</CardTitle>
-          <div className="flex items-center bg-muted/60 p-0.5 rounded-md border border-border/40">
+          <CardTitle className="text-sm font-semibold">{messages.home.news}</CardTitle>
+          <div className="flex items-center rounded-md border border-border/40 bg-muted/20 p-0.5">
             <button
               onClick={() => switchSource("latest")}
               className={cn(
-                "px-2 py-0.5 text-[9px] font-bold rounded transition-all",
+                "rounded px-2 py-0.5 text-xs font-medium transition-all",
                 source === "latest"
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              最新
+              {messages.home.latest}
             </button>
             <button
               onClick={() => switchSource("hot")}
               className={cn(
-                "px-2 py-0.5 text-[9px] font-bold rounded transition-all",
+                "rounded px-2 py-0.5 text-xs font-medium transition-all",
                 source === "hot"
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              热门
+              {messages.home.hot}
             </button>
           </div>
         </div>
@@ -361,18 +363,18 @@ function CampusNewsCard({ token }: { token: string | null }) {
                   onClick={() => openNews(item)}
                   className="group flex items-start justify-between gap-3 w-full rounded-lg px-2 py-2 transition-colors hover:bg-muted/40 text-left"
                 >
-                  <span className="line-clamp-1 text-xs font-semibold text-foreground/80 group-hover:text-primary transition-colors">
+                  <span className="line-clamp-1 text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                     {item.title}
                   </span>
-                  <span className="shrink-0 text-[9px] font-mono text-muted-foreground">
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
                     {item.publishedAt?.slice(5, 10).replace("-", "/")}
                   </span>
                 </button>
               ))}
             </div>
             <div className="shrink-0 flex items-center justify-between pt-3 pb-1 border-t border-border/20 mt-2">
-              <span className="text-[9px] text-muted-foreground font-semibold">
-                第 {pageNo} 页 / 共 {data?.total || "???"} 条
+              <span className="text-xs font-medium text-muted-foreground">
+                {messages.home.newsPage(pageNo, data?.total || "???")}
               </span>
               <div className="flex gap-1">
                 <Button
@@ -398,7 +400,7 @@ function CampusNewsCard({ token }: { token: string | null }) {
           </div>
         ) : (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground font-medium">
-            未发现数据
+            {messages.common.noData}
           </div>
         )}
       </CardContent>

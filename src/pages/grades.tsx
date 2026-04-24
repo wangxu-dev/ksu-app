@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getSavedToken } from "@/lib/auth";
 import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+import { useI18n } from "@/lib/i18n";
 import { getGrades } from "@/lib/api/ksu";
 import { toUserMessage } from "@/lib/errors/user-message";
 import { getCachedGrades } from "@/lib/grades";
 import { cn } from "@/lib/utils";
 
-function formatDateTime(ts: number) {
-  return new Date(ts).toLocaleString("zh-CN", {
+function formatDateTime(ts: number, locale: string) {
+  return new Date(ts).toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -33,6 +34,7 @@ export function GradesPage() {
 function GradesContent() {
   const navigate = useNavigate();
   const [token] = useState(() => getSavedToken());
+  const { locale, messages } = useI18n();
 
   useEffect(() => {
     if (!token) {
@@ -51,7 +53,9 @@ function GradesContent() {
   const data = gradesQuery.data ?? null;
   const fetchedAt = gradesQuery.dataUpdatedAt || null;
   const isLoading = gradesQuery.isFetching;
-  const error = gradesQuery.error ? toUserMessage(gradesQuery.error, "获取成绩失败") : null;
+  const error = gradesQuery.error
+    ? toUserMessage(gradesQuery.error, messages.grades.fetchFailed)
+    : null;
 
   const summary = useMemo(() => {
     if (!data) return null;
@@ -69,17 +73,14 @@ function GradesContent() {
       <div className="shrink-0 space-y-6">
         <div id="summary" className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">我的成绩单概览</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{messages.grades.title}</h1>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                教务系统数据同步
+              <span className="text-xs font-medium text-muted-foreground">
+                {messages.grades.sync}
               </span>
               {fetchedAt && (
-                <Badge
-                  variant="outline"
-                  className="h-4 text-[9px] px-1.5 font-mono border-muted-foreground/20"
-                >
-                  同步时间：{formatDateTime(fetchedAt)}
+                <Badge variant="outline" className="h-5 border-border/60 px-2 font-mono text-xs">
+                  {messages.grades.syncTime(formatDateTime(fetchedAt, locale))}
                 </Badge>
               )}
             </div>
@@ -87,37 +88,42 @@ function GradesContent() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 gap-2 rounded-lg shadow-none border-border/60 hover:border-primary/40 text-xs font-bold"
+            className="h-8 gap-2 rounded-lg border-border/60 text-xs font-medium shadow-none hover:border-primary/40"
             onClick={() => gradesQuery.refetch()}
             disabled={isLoading}
           >
             <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-            {isLoading ? "正在同步" : "刷新数据"}
+            {isLoading ? messages.grades.syncing : messages.grades.refresh}
           </Button>
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2 text-[11px] text-destructive font-bold">
-            同步异常：{error}
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2 text-sm font-medium text-destructive">
+            {messages.grades.syncError}：{error}
           </div>
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="平均绩点 (GPA)"
+            title={messages.grades.gpa}
             value={summary?.gpa}
             icon={GraduationCap}
             color="text-primary"
           />
-          <StatCard title="加权平均分" value={summary?.ga} icon={Calculator} color="text-chart-2" />
           <StatCard
-            title="累计总学分"
+            title={messages.grades.ga}
+            value={summary?.ga}
+            icon={Calculator}
+            color="text-chart-2"
+          />
+          <StatCard
+            title={messages.grades.totalCredit}
             value={summary?.totalCredit?.toFixed(1)}
             icon={Award}
             color="text-chart-3"
           />
           <StatCard
-            title="课程总分"
+            title={messages.grades.totalScore}
             value={summary?.totalScore?.toFixed(0)}
             icon={Star}
             color="text-chart-4"
@@ -139,18 +145,18 @@ function GradesContent() {
                 {sem.gradeList.map((g) => (
                   <div
                     key={g.id}
-                    className="group flex items-center justify-between gap-4 rounded-xl border border-border/50 bg-card/30 p-3 transition-all hover:border-primary/30 hover:bg-card shadow-xs"
+                    className="group flex items-center justify-between gap-4 rounded-xl border border-border/40 bg-card p-3 shadow-xs transition-all hover:border-primary/40"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold text-xs group-hover:text-primary transition-colors text-foreground">
                         {g.courseName}
                       </div>
                       <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-muted-foreground/60">
-                          学分：{g.credit.toFixed(1)}
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {messages.grades.credit}：{g.credit.toFixed(1)}
                         </span>
-                        <span className="text-[9px] font-bold text-muted-foreground/60">
-                          绩点：{g.gp.toFixed(1)}
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {messages.grades.gp}：{g.gp.toFixed(1)}
                         </span>
                       </div>
                     </div>
@@ -172,9 +178,9 @@ function GradesContent() {
 
 function StatCard({ title, value, icon: Icon, color }: any) {
   return (
-    <Card className="border-border/40 shadow-none overflow-hidden bg-muted/5">
+    <Card className="overflow-hidden border-border/40 bg-muted/5 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0 px-4 pt-3">
-        <CardTitle className="text-[10px] font-bold text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
         <Icon className={cn("h-3.5 w-3.5 opacity-60", color)} />
       </CardHeader>
       <CardContent className="px-4 pb-3">

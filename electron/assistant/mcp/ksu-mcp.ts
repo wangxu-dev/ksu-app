@@ -46,6 +46,7 @@ type ToolCacheAdapter = {
 type RegisteredTool = {
   name: string;
   description: string;
+  cacheVersion?: string;
   input: z.ZodObject<z.ZodRawShape>;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
@@ -58,6 +59,7 @@ type KsuMcpRegistry = {
   listTools: () => Array<{
     name: string;
     description: string;
+    cacheVersion?: string;
     inputSchema: Record<string, unknown>;
     outputSchema: Record<string, unknown>;
     errorCodes: string[];
@@ -85,12 +87,35 @@ type KsuMcpRegistry = {
 type KsuToolDefinition = {
   name: string;
   description: string;
+  cacheVersion?: string;
   input: z.ZodObject<z.ZodRawShape>;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
   errorCodes: string[];
   cachePolicy: CachePolicy;
   handler: RegisteredTool["handler"];
+};
+
+type GradeCourse = {
+  courseName?: unknown;
+  credit?: unknown;
+  gp?: unknown;
+  score?: unknown;
+  scoreText?: unknown;
+  semesterName?: unknown;
+};
+
+type SemesterGrade = {
+  semester?: unknown;
+  gradeList?: unknown;
+};
+
+type GradesData = {
+  totalCredit?: unknown;
+  gpa?: unknown;
+  ga?: unknown;
+  totalScore?: unknown;
+  semesterGradeList?: unknown;
 };
 
 const logger = createLogger("assistant:mcp");
@@ -164,10 +189,16 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function buildCacheKey(name: string, args: Record<string, unknown>, context: ToolContext): string {
+function buildCacheKey(
+  name: string,
+  args: Record<string, unknown>,
+  context: ToolContext,
+  cacheVersion = "v1",
+): string {
   const token = String(context.token || "").trim();
   const payload = stableStringify({
     name,
+    cacheVersion,
     args,
     tokenHash: token ? createHash("sha256").update(token).digest("hex") : "",
   });
@@ -196,6 +227,91 @@ function createDefaultCacheAdapter(): ToolCacheAdapter {
     delete(cacheKey) {
       memoryCache.delete(cacheKey);
     },
+  };
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function toText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function normalizeGradeCourse(course: GradeCourse): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+
+  const courseName = toText(course.courseName);
+  const credit = toNumber(course.credit);
+  const gp = toNumber(course.gp);
+  const score = toNumber(course.score);
+  const scoreText = toText(course.scoreText);
+
+  if (courseName) normalized.courseName = courseName;
+  if (credit !== null) normalized.credit = credit;
+  if (gp !== null) normalized.gp = gp;
+  if (scoreText) normalized.scoreText = scoreText;
+  if (score !== null) normalized.score = score;
+
+  return normalized;
+}
+
+function normalizeGradesData(raw: GradesData): Record<string, unknown> {
+  const totalCredit = toNumber(raw.totalCredit);
+  const gpa = toText(raw.gpa);
+  const ga = toText(raw.ga);
+  const totalScore = toNumber(raw.totalScore);
+
+  const semesterGradeList = Array.isArray(raw.semesterGradeList)
+    ? (raw.semesterGradeList as SemesterGrade[])
+    : [];
+
+  const semesters = semesterGradeList
+    .map((semesterItem) => {
+      const semester = toText(semesterItem.semester);
+      const gradeList = Array.isArray(semesterItem.gradeList)
+        ? (semesterItem.gradeList as GradeCourse[])
+        : [];
+      const courses = gradeList
+        .map((course) => normalizeGradeCourse(course))
+        .filter((course) => Object.keys(course).length > 0);
+
+      if (!semester || courses.length === 0) return null;
+
+      return {
+        semester,
+        courseCount: courses.length,
+        courses: courses.slice(0, 12),
+      };
+    })
+    .filter(
+      (
+        item,
+      ): item is { semester: string; courseCount: number; courses: Record<string, unknown>[] } =>
+        item !== null,
+    );
+
+  return {
+    summary: {
+      ...(gpa ? { gpa } : {}),
+      ...(ga ? { ga } : {}),
+      ...(totalCredit !== null ? { totalCredit } : {}),
+      ...(totalScore !== null ? { totalScore } : {}),
+    },
+    semesterCount: semesters.length,
+    semesters: semesters.slice(0, 6),
   };
 }
 
@@ -314,9 +430,14 @@ function createKsuToolDefinitions({
   register({
     name: "get_grades",
     description: "获取成绩信息",
+    cacheVersion: "v2",
     input: z.object({}),
     inputSchema: { type: "object", properties: {}, required: [] },
-    outputSchema: { type: "object", nullable: false, description: "grade list and GPA summary" },
+    outputSchema: {
+      type: "object",
+      nullable: false,
+      description: "normalized grades summary and semester course list",
+    },
     errorCodes: [
       "TOKEN_REQUIRED",
       "UPSTREAM_REQUEST_FAILED",
@@ -330,7 +451,7 @@ function createKsuToolDefinitions({
       if (!raw.success || raw.code !== 200 || !raw.data) {
         throw new Error(String(raw.msg || "get_grades failed"));
       }
-      return raw.data;
+      return normalizeGradesData(raw.data as GradesData);
     },
   });
 
@@ -407,6 +528,7 @@ function createKsuMcpRegistry({
       const result = Array.from(tools.values()).map((t) => ({
         name: t.name,
         description: t.description,
+        cacheVersion: t.cacheVersion,
         inputSchema: t.inputSchema,
         outputSchema: t.outputSchema,
         errorCodes: t.errorCodes,
@@ -443,7 +565,7 @@ function createKsuMcpRegistry({
       }
       if (tool.cachePolicy.scope !== "none" && tool.cachePolicy.ttlMs > 0) {
         const nowTs = Date.now();
-        const cacheKey = buildCacheKey(name, parsedArgs, context);
+        const cacheKey = buildCacheKey(name, parsedArgs, context, tool.cacheVersion);
         const cached = cacheAdapter.get(cacheKey, nowTs);
         if (cached) {
           logger.debug("tool cache hit", { name, scope: tool.cachePolicy.scope });

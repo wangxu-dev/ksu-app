@@ -6,7 +6,7 @@ import { createLogger } from "./shared/logger.js";
 import { login } from "./auth/login.js";
 import { buildKsuRequest, type KsuRequestPayload } from "./ksu/request-builder.js";
 import { dispatchRequest } from "./request/dispatcher.js";
-import { runAssistantStream } from "./assistant/runtime.js";
+import { abortAssistantStream, runAssistantStream } from "./assistant/runtime.js";
 import { createAssistantStore } from "./assistant/store.js";
 import { createKsuMcpRegistry } from "./assistant/mcp/ksu-mcp.js";
 import { createUpdateManager } from "./updater/manager.js";
@@ -24,9 +24,11 @@ import {
 } from "./request/channels.js";
 import {
   ASSISTANT_STREAM_START_CHANNEL,
+  ASSISTANT_STREAM_ABORT_CHANNEL,
   ASSISTANT_CONVERSATION_CREATE_CHANNEL,
   ASSISTANT_CONVERSATION_LIST_CHANNEL,
   ASSISTANT_CONVERSATION_MESSAGES_CHANNEL,
+  ASSISTANT_CONVERSATION_TIMELINE_CHANNEL,
   ASSISTANT_CONVERSATION_DELETE_CHANNEL,
   ASSISTANT_CONVERSATION_REPLACE_MESSAGES_CHANNEL,
   ASSISTANT_SETTINGS_GET_CHANNEL,
@@ -379,9 +381,6 @@ app.whenReady().then(() => {
       message?: string;
       token?: string;
       conversationId?: string;
-      apiKey?: string;
-      model?: string;
-      baseUrl?: string;
     };
     logger.info("assistant stream request received", {
       conversationId: String(safePayload.conversationId || ""),
@@ -395,14 +394,25 @@ app.whenReady().then(() => {
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
     });
   });
-  ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload: unknown) =>
-    assistantStore.createConversation((payload as { title?: string } | undefined)?.title),
-  );
+  ipcMain.handle(ASSISTANT_STREAM_ABORT_CHANNEL, async (_event, payload: unknown) => {
+    const safePayload = (payload || {}) as { streamId?: string };
+    const streamId = String(safePayload.streamId || "");
+    return { ok: abortAssistantStream(streamId) };
+  });
+  ipcMain.handle(ASSISTANT_CONVERSATION_CREATE_CHANNEL, async (_event, payload: unknown) => {
+    const safePayload = (payload || {}) as { title?: string; provider?: "openrouter" | "deepseek" };
+    return assistantStore.createConversation(safePayload.title, safePayload.provider);
+  });
   ipcMain.handle(ASSISTANT_CONVERSATION_LIST_CHANNEL, async () =>
     assistantStore.listConversations(),
   );
   ipcMain.handle(ASSISTANT_CONVERSATION_MESSAGES_CHANNEL, async (_event, payload: unknown) =>
     assistantStore.getMessages(
+      String((payload as { conversationId?: string } | undefined)?.conversationId || ""),
+    ),
+  );
+  ipcMain.handle(ASSISTANT_CONVERSATION_TIMELINE_CHANNEL, async (_event, payload: unknown) =>
+    assistantStore.listTimelineEvents(
       String((payload as { conversationId?: string } | undefined)?.conversationId || ""),
     ),
   );

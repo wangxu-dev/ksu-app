@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { HomeSearch } from "@/components/home-search";
 import { getSavedToken } from "@/lib/auth";
 import { KSU_CACHE_POLICY } from "@/lib/cache/policy";
+import { useI18n } from "@/lib/i18n";
 import { formatYearMonth, weekText } from "@/lib/calendar";
 import { getCalendarMonth } from "@/lib/api/ksu";
 import { toUserMessage } from "@/lib/errors/user-message";
@@ -40,6 +41,7 @@ function CalendarContent() {
   const navigate = useNavigate();
   const [token] = useState(() => getSavedToken());
   const [cursor, setCursor] = useState(() => new Date());
+  const { locale, messages } = useI18n();
 
   useEffect(() => {
     if (!token) navigate({ to: "/login" });
@@ -56,7 +58,9 @@ function CalendarContent() {
   const days = calendarQuery.data ?? [];
   const fetchedAt = calendarQuery.dataUpdatedAt || null;
   const isLoading = calendarQuery.isFetching;
-  const error = calendarQuery.error ? toUserMessage(calendarQuery.error, "获取校历失败") : null;
+  const error = calendarQuery.error
+    ? toUserMessage(calendarQuery.error, messages.calendar.fetchFailed)
+    : null;
 
   const dayByDate = useMemo(() => {
     const m = new Map<string, (typeof days)[number]>();
@@ -95,7 +99,9 @@ function CalendarContent() {
           <h1 className="text-2xl font-semibold tracking-tight">{yearMonth}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {fetchedAt
-              ? `上次更新：${new Date(fetchedAt).toLocaleString("zh-CN", { hour12: false })}`
+              ? messages.calendar.updatedAt(
+                  new Date(fetchedAt).toLocaleString(locale, { hour12: false }),
+                )
               : " "}
           </p>
         </div>
@@ -107,10 +113,10 @@ function CalendarContent() {
             className="gap-2"
           >
             <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-            上月
+            {messages.calendar.prevMonth}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>
-            本月
+            {messages.calendar.currentMonth}
           </Button>
           <Button
             variant="outline"
@@ -118,7 +124,7 @@ function CalendarContent() {
             onClick={() => setCursor((d) => addMonths(d, 1))}
             className="gap-2"
           >
-            下月
+            {messages.calendar.nextMonth}
             <ChevronRight aria-hidden="true" className="h-4 w-4" />
           </Button>
           <Button
@@ -129,16 +135,18 @@ function CalendarContent() {
             disabled={isLoading}
           >
             <RefreshCw aria-hidden="true" className="h-4 w-4" />
-            刷新
+            {messages.calendar.refresh}
           </Button>
         </div>
       </div>
 
-      {error ? <p className="mt-4 text-sm text-muted-foreground">获取失败：{error}</p> : null}
+      {error ? (
+        <p className="mt-4 text-sm text-muted-foreground">{messages.calendar.fetchError(error)}</p>
+      ) : null}
 
       <Card id="month" className="mt-4 scroll-mt-20">
         <CardHeader>
-          <CardTitle className="text-base">月视图</CardTitle>
+          <CardTitle className="text-base">{messages.calendar.monthView}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
@@ -161,14 +169,14 @@ function CalendarContent() {
                   className={[
                     "min-h-20 rounded-lg border bg-background p-2",
                     cell.inMonth ? "" : "opacity-50",
-                    isToday ? "border-primary ring-1 ring-primary/30" : "",
+                    isToday ? "border-primary ring-1 ring-primary/20" : "",
                     showLabel ? "bg-primary/5 dark:bg-primary/10 border-primary/20" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold tabular-nums">{cell.date.getDate()}</div>
                     {day?.zc ? (
-                      <div className="text-[10px] text-muted-foreground">{weekText(day.zc)}</div>
+                      <div className="text-xs text-muted-foreground">{weekText(day.zc)}</div>
                     ) : null}
                   </div>
                   {label ? (

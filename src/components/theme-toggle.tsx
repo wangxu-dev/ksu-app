@@ -7,6 +7,7 @@ import {
   setThemeMode,
   type ThemeMode,
 } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n";
 import { Laptop, Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -20,6 +21,7 @@ function Icon({ mode }: { mode: "light" | "dark" }) {
 
 export function ThemeToggle() {
   const [mode, setMode] = useState<ThemeMode>(() => getThemeMode());
+  const { messages } = useI18n();
   const resolved = useMemo(() => resolveTheme(mode), [mode]);
 
   useEffect(() => {
@@ -37,9 +39,9 @@ export function ThemeToggle() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2" aria-label="切换主题">
+        <Button variant="ghost" size="sm" className="gap-2" aria-label={messages.theme.ariaLabel}>
           <Icon mode={resolved} />
-          <span className="hidden sm:inline">主题</span>
+          <span className="hidden sm:inline">{messages.theme.label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2">
@@ -51,7 +53,7 @@ export function ThemeToggle() {
             onClick={() => choose("system")}
           >
             <Laptop aria-hidden="true" className="h-4 w-4" />
-            跟随系统
+            {messages.theme.system}
           </Button>
           <Button
             variant={mode === "light" ? "secondary" : "ghost"}
@@ -60,7 +62,7 @@ export function ThemeToggle() {
             onClick={() => choose("light")}
           >
             <Sun aria-hidden="true" className="h-4 w-4" />
-            浅色
+            {messages.theme.light}
           </Button>
           <Button
             variant={mode === "dark" ? "secondary" : "ghost"}
@@ -69,7 +71,7 @@ export function ThemeToggle() {
             onClick={() => choose("dark")}
           >
             <Moon aria-hidden="true" className="h-4 w-4" />
-            深色
+            {messages.theme.dark}
           </Button>
         </div>
       </PopoverContent>
