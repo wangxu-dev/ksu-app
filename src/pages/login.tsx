@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { LoginForm } from "@/components/login/login-form";
+import { useI18n } from "@/lib/i18n";
 import { publicAsset } from "@/lib/assets";
 
 const CAMPUS_IMAGES = [
@@ -11,6 +12,7 @@ const CAMPUS_IMAGES = [
 ] as const;
 
 export function LoginPage() {
+  const { messages } = useI18n();
   const randomImage = useMemo(
     () => publicAsset(CAMPUS_IMAGES[Math.floor(Math.random() * CAMPUS_IMAGES.length)]),
     [],
@@ -20,7 +22,11 @@ export function LoginPage() {
     <div className="min-h-screen flex flex-row">
       {/* 左侧：校园风光 50% */}
       <div className="w-1/2 h-screen relative overflow-hidden">
-        <img src={randomImage} alt="喀什大学校园风光" className="w-full h-full object-cover" />
+        <img
+          src={randomImage}
+          alt={messages.login.campusAlt}
+          className="w-full h-full object-cover"
+        />
       </div>
 
       {/* 右侧：登录表单 50% */}

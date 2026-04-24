@@ -3,13 +3,13 @@ import { Home, Bot, GraduationCap, CalendarDays } from "lucide-react";
 
 export type AppNavItem = {
   to: "/home" | "/assistant" | "/grades" | "/calendar";
-  label: string;
+  labelKey: "home" | "grades" | "calendar" | "assistant";
   icon: LucideIcon;
 };
 
 export const NAV_ITEMS: AppNavItem[] = [
-  { to: "/home", label: "首页", icon: Home },
-  { to: "/grades", label: "成绩单", icon: GraduationCap },
-  { to: "/calendar", label: "校历", icon: CalendarDays },
-  { to: "/assistant", label: "AI 助手", icon: Bot },
+  { to: "/home", labelKey: "home", icon: Home },
+  { to: "/grades", labelKey: "grades", icon: GraduationCap },
+  { to: "/calendar", labelKey: "calendar", icon: CalendarDays },
+  { to: "/assistant", labelKey: "assistant", icon: Bot },
 ];

@@ -2,6 +2,7 @@ import { Bot, Loader2, RotateCcw, User as UserIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { getToolDisplayName } from "@/lib/assistant/tool-display";
 import type { AssistantViewStatus, ChatMessage, ToolActivity } from "@/lib/assistant/types";
@@ -23,27 +24,37 @@ function buildInlineStatusText(
   status: AssistantViewStatus,
   toolActivities: ToolActivity[],
   lastError: string | null | undefined,
+  text: {
+    requestSubmitted: string;
+    assistantWorking: string;
+    toolWorking: string;
+    toolDone: string;
+    toolSummarizing: string;
+    streaming: string;
+    aborted: string;
+    failed: string;
+  },
 ): string {
   const latestTool =
     [...toolActivities].reverse().find((item) => item.state === "running") ||
     toolActivities[toolActivities.length - 1];
 
-  if (status === "submitted") return "请求已发送";
+  if (status === "submitted") return text.requestSubmitted;
   if (status === "thinking") {
     if (latestTool) {
-      return `${getToolDisplayName(latestTool.name)} · ${latestTool.state === "running" ? "处理中" : "已完成"}`;
+      return `${getToolDisplayName(latestTool.name)} · ${latestTool.state === "running" ? text.toolWorking : text.toolDone}`;
     }
-    return "助手处理中";
+    return text.assistantWorking;
   }
   if (status === "streaming") {
     if (latestTool?.state === "running") {
-      return `${getToolDisplayName(latestTool.name)} · 正在整理回答`;
+      return `${getToolDisplayName(latestTool.name)} · ${text.toolSummarizing}`;
     }
-    return "正在生成回答";
+    return text.streaming;
   }
-  if (status === "aborted") return "已停止";
-  if (status === "error") return lastError || "请求失败";
-  return "助手处理中";
+  if (status === "aborted") return text.aborted;
+  if (status === "error") return lastError || text.failed;
+  return text.assistantWorking;
 }
 
 function AssistantMessageList({
@@ -58,7 +69,17 @@ function AssistantMessageList({
   status,
   toolActivities = [],
 }: AssistantMessageListProps) {
-  const inlineStatusText = buildInlineStatusText(status, toolActivities, lastError);
+  const { messages: text } = useI18n();
+  const inlineStatusText = buildInlineStatusText(status, toolActivities, lastError, {
+    requestSubmitted: text.assistant.requestSubmitted,
+    assistantWorking: text.assistant.assistantWorking,
+    toolWorking: text.assistant.toolWorking,
+    toolDone: text.assistant.toolDone,
+    toolSummarizing: text.assistant.toolSummarizing,
+    streaming: text.assistant.streaming,
+    aborted: text.assistant.aborted,
+    failed: text.assistant.failed,
+  });
 
   return (
     <div
@@ -73,7 +94,7 @@ function AssistantMessageList({
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center space-y-3 text-center opacity-40">
           <Bot className="h-9 w-9 text-foreground/70" />
-          <p className="text-xs font-medium text-foreground">开始对话</p>
+          <p className="text-sm font-medium text-foreground">{text.assistant.startConversation}</p>
         </div>
       ) : null}
 
@@ -107,11 +128,11 @@ function AssistantMessageList({
               )}
             >
               {isUser ? (
-                <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
+                <div className="rounded-2xl border border-primary/15 bg-primary/10 px-3.5 py-2.5 text-sm font-medium text-foreground">
                   {message.content}
                 </div>
               ) : hasText ? (
-                <div className="px-1 py-1 text-[13px] font-medium leading-relaxed text-foreground/90">
+                <div className="px-1 py-1 text-sm font-medium leading-relaxed text-foreground">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -120,7 +141,7 @@ function AssistantMessageList({
                         <ul className="mb-3 list-disc space-y-1 pl-5">{children}</ul>
                       ),
                       code: ({ children }) => (
-                        <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-bold">
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium">
                           {children}
                         </code>
                       ),
@@ -130,7 +151,7 @@ function AssistantMessageList({
                   </ReactMarkdown>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 px-1 text-[10px] font-medium text-muted-foreground">
+                <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>{inlineStatusText}</span>
                 </div>
@@ -142,8 +163,8 @@ function AssistantMessageList({
                     size="icon"
                     className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
                     onClick={() => void onRegenerate?.()}
-                    title="重新回答"
-                    aria-label="重新回答"
+                    title={text.assistant.regenerate}
+                    aria-label={text.assistant.regenerate}
                   >
                     <RotateCcw className="h-3 w-3" />
                   </Button>

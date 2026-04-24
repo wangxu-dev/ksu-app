@@ -1,5 +1,6 @@
 import { Inbox, MessageSquareText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { AssistantConversation } from "@/lib/assistant/types";
 
@@ -22,6 +23,8 @@ function AssistantHistoryPanel({
   onSelectConversation,
   open,
 }: AssistantHistoryPanelProps) {
+  const { messages } = useI18n();
+
   return (
     <div
       className={cn(
@@ -30,25 +33,25 @@ function AssistantHistoryPanel({
       )}
     >
       <div className="flex shrink-0 items-center justify-between px-3 py-3">
-        <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
-          对话历史
+        <span className="text-xs font-medium text-muted-foreground">
+          {messages.assistant.historyTitle}
         </span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-5 w-5 hover:bg-primary/10 hover:text-primary"
+          className="h-6 w-6 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
           disabled={disabled}
           onClick={onNewConversation}
-          title="开启新对话"
+          title={messages.assistant.newConversation}
         >
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="flex-1 space-y-0.5 overflow-auto px-2 pb-2 [scrollbar-width:thin]">
         {conversations.length === 0 ? (
-          <div className="flex h-20 flex-col items-center justify-center px-2 text-center text-[10px] text-muted-foreground opacity-50">
+          <div className="flex h-20 flex-col items-center justify-center px-2 text-center text-xs text-muted-foreground opacity-60">
             <Inbox className="mb-1 h-4 w-4" />
-            <span>暂无历史记录</span>
+            <span>{messages.assistant.historyEmpty}</span>
           </div>
         ) : (
           conversations.map((conversation) => (
@@ -57,12 +60,14 @@ function AssistantHistoryPanel({
               onClick={() => onSelectConversation(conversation.id)}
               className={cn(
                 "group flex cursor-pointer items-center gap-2 rounded-xl border border-transparent p-2 transition-all",
-                activeConversationId === conversation.id ? "bg-muted/40" : "hover:bg-muted/25",
+                activeConversationId === conversation.id
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-accent/60",
                 disabled && "pointer-events-none opacity-60",
               )}
             >
               <MessageSquareText className="h-3 w-3 shrink-0 opacity-40" />
-              <span className="flex-1 truncate text-[11px] font-medium text-foreground/80">
+              <span className="flex-1 truncate text-xs font-medium text-foreground">
                 {conversation.title}
               </span>
               <button

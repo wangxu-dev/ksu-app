@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useI18n } from "@/lib/i18n";
 import { User, Lock } from "lucide-react";
 import { useLogin } from "@/hooks/use-login";
 import { useNavigate } from "@tanstack/react-router";
@@ -13,6 +14,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const { login, isLoading, error, rememberedAccount } = useLogin();
+  const { messages } = useI18n();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,20 +44,20 @@ export function LoginForm() {
 
       {/* 标题 */}
       <div className="text-center">
-        <p className="text-sm text-muted-foreground">喀什大学认证统一入口</p>
+        <p className="text-sm text-muted-foreground">{messages.login.entry}</p>
       </div>
 
       {/* 表单字段 */}
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="username" className="text-sm">
-            学号
+            {messages.login.username}
           </Label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="username"
-              placeholder="请输入学号"
+              placeholder={messages.login.usernamePlaceholder}
               className="pl-10"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -66,14 +68,14 @@ export function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-sm">
-            密码
+            {messages.login.password}
           </Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="password"
               type="password"
-              placeholder="请输入密码"
+              placeholder={messages.login.passwordPlaceholder}
               className="pl-10"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -91,7 +93,7 @@ export function LoginForm() {
             disabled={isLoading}
           />
           <Label htmlFor="remember" className="text-sm cursor-pointer">
-            记住账号
+            {messages.login.remember}
           </Label>
         </div>
 
@@ -100,7 +102,7 @@ export function LoginForm() {
         )}
 
         <Button className="w-full" onClick={handleSubmit} disabled={isLoading || !isValid}>
-          {isLoading ? "登录中..." : "登录"}
+          {isLoading ? messages.login.submitting : messages.login.submit}
         </Button>
       </div>
     </div>

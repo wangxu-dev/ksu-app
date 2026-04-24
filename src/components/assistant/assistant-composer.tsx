@@ -1,6 +1,7 @@
 import { SendHorizontal, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n";
 
 type AssistantComposerProps = {
   disabled?: boolean;
@@ -19,6 +20,8 @@ function AssistantComposer({
   prompt,
   setPrompt,
 }: AssistantComposerProps) {
+  const { messages } = useI18n();
+
   return (
     <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
       <div className="mx-auto flex w-full max-w-4xl items-end gap-2 rounded-2xl border border-border/40 bg-background/80 p-2 transition-all focus-within:border-primary/30">
@@ -31,9 +34,9 @@ function AssistantComposer({
               void onSend();
             }
           }}
-          placeholder="输入指令或提问..."
+          placeholder={messages.assistant.sendPlaceholder}
           rows={1}
-          className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent py-2 text-[13px] font-medium shadow-none focus-visible:ring-0"
+          className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent py-2 text-sm font-medium shadow-none focus-visible:ring-0"
         />
         <Button
           size="icon"

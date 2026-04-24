@@ -7,18 +7,15 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/lib/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { CalendarDays, GraduationCap, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-const COMMANDS = [
-  { label: "成绩", to: "/grades" as const, icon: GraduationCap },
-  { label: "校历", to: "/calendar" as const, icon: CalendarDays },
-];
-
 export function HomeSearch() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { messages } = useI18n();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -31,7 +28,14 @@ export function HomeSearch() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const placeholder = useMemo(() => "搜索功能（Ctrl+K）", []);
+  const commands = useMemo(
+    () => [
+      { label: messages.calendar.grades, to: "/grades" as const, icon: GraduationCap },
+      { label: messages.calendar.calendar, to: "/calendar" as const, icon: CalendarDays },
+    ],
+    [messages],
+  );
+  const placeholder = useMemo(() => messages.calendar.searchPlaceholder, [messages]);
 
   return (
     <>
@@ -44,11 +48,11 @@ export function HomeSearch() {
       </div>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="搜索…" />
+        <CommandInput placeholder={messages.calendar.searchInput} />
         <CommandList>
-          <CommandEmpty>没有匹配的结果</CommandEmpty>
-          <CommandGroup heading="功能">
-            {COMMANDS.map((c) => {
+          <CommandEmpty>{messages.calendar.searchEmpty}</CommandEmpty>
+          <CommandGroup heading={messages.calendar.function}>
+            {commands.map((c) => {
               const Icon = c.icon;
               return (
                 <CommandItem

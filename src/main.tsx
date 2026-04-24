@@ -5,6 +5,7 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { createBrowserHistory, createHashHistory } from "@tanstack/history";
 import { ThemeProvider } from "next-themes";
 import "./index.css";
+import { I18nProvider } from "@/lib/i18n";
 import { createQueryClient } from "@/lib/query/client";
 import { startRendererRequesterBridge } from "@/lib/request/renderer-requester-bridge";
 
@@ -26,9 +27,11 @@ startRendererRequesterBridge();
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </I18nProvider>
     </ThemeProvider>
   </React.StrictMode>,
 );

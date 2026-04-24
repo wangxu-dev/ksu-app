@@ -112,7 +112,8 @@
   body {
     /* 强制使用思源黑体 */
     font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    @apply bg-background text-foreground antialiased overflow-hidden;
+    @apply bg-background text-foreground text-sm antialiased overflow-hidden;
+    line-height: 1.5;
   }
   h1,
   h2,

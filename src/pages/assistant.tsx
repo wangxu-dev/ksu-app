@@ -4,6 +4,7 @@ import { AssistantComposer } from "@/components/assistant/assistant-composer";
 import { AssistantHistoryPanel } from "@/components/assistant/assistant-history-panel";
 import { AssistantMessageList } from "@/components/assistant/assistant-message-list";
 import { AssistantSettingsDialog } from "@/components/assistant/assistant-settings-dialog";
+import { useI18n } from "@/lib/i18n";
 import { useAssistantController } from "@/lib/assistant/use-assistant-controller";
 
 export function AssistantPage() {
@@ -11,6 +12,7 @@ export function AssistantPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesBottomRef = useRef<HTMLDivElement | null>(null);
+  const { messages } = useI18n();
   const controller = useAssistantController();
 
   useEffect(() => {
@@ -21,9 +23,9 @@ export function AssistantPage() {
 
   const activeTitle =
     controller.activeConversationId === null
-      ? "新对话 (草稿)"
+      ? messages.assistant.conversationDraftTitle
       : controller.conversations.find((item) => item.id === controller.activeConversationId)
-          ?.title || "加载中...";
+          ?.title || messages.assistant.conversationLoadingTitle;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
