@@ -1,32 +1,17 @@
 import { getCurrentTimePayload } from "../shared/time.js";
-import type { UnifiedResponsePayload } from "../request/types.js";
+import {
+  createKsuMcpRegistry,
+  type CallKsuEndpoint,
+  type KsuToolDefinition,
+} from "./mcp/ksu-mcp.js";
 
-type KsuEndpointInput = {
-  endpoint: "userInfo" | "personalInfo" | "grades" | "calendarMonth";
-  token: string;
-  yearMonth?: string;
-};
-
-type CallKsuEndpoint = (input: KsuEndpointInput) => Promise<UnifiedResponsePayload>;
-
-type KsuMcpTools = {
+type KsuMcpTools = Record<string, (input?: { yearMonth?: string }) => Promise<unknown>> & {
   get_user_info: () => Promise<unknown>;
   get_personal_info: () => Promise<unknown>;
   get_grades: () => Promise<unknown>;
   get_calendar: (input: { yearMonth: string }) => Promise<unknown[]>;
   get_current_time: () => Promise<ReturnType<typeof getCurrentTimePayload>>;
 };
-
-function parseJsonBody(response: UnifiedResponsePayload): Record<string, unknown> {
-  if (!response.ok) {
-    throw new Error(response.error || `request failed (${response.status})`);
-  }
-  try {
-    return JSON.parse(response.body || "{}") as Record<string, unknown>;
-  } catch {
-    throw new Error("invalid json response");
-  }
-}
 
 function buildKsuMcpTools({
   callKsuEndpoint,
@@ -35,49 +20,20 @@ function buildKsuMcpTools({
   callKsuEndpoint: CallKsuEndpoint;
   token: string;
 }): KsuMcpTools {
-  return {
-    async get_user_info() {
-      const raw = parseJsonBody(await callKsuEndpoint({ endpoint: "userInfo", token }));
-      if (raw.code !== 0 || !raw.data) {
-        throw new Error(String(raw.message || "failed to get user info"));
-      }
-      return raw.data;
-    },
+  const registry = createKsuMcpRegistry({ callKsuEndpoint });
+  const tools = Object.create(null) as KsuMcpTools;
 
-    async get_personal_info() {
-      const raw = parseJsonBody(await callKsuEndpoint({ endpoint: "personalInfo", token }));
-      if (raw.code !== 0 || !raw.data) {
-        throw new Error(String(raw.message || "failed to get personal info"));
-      }
-      return raw.data;
-    },
+  for (const item of registry.listTools()) {
+    tools[item.name] = async (input?: { yearMonth?: string }) =>
+      registry.callTool(item.name, input || {}, { token });
+  }
 
-    async get_grades() {
-      const raw = parseJsonBody(await callKsuEndpoint({ endpoint: "grades", token }));
-      if (raw.code !== 200 || !raw.success || !raw.data) {
-        throw new Error(String(raw.msg || "failed to get grades"));
-      }
-      return raw.data;
-    },
+  if (!tools.get_current_time) {
+    tools.get_current_time = async () => getCurrentTimePayload();
+  }
 
-    async get_calendar(input) {
-      const yearMonth = input?.yearMonth;
-      if (!yearMonth) throw new Error("yearMonth is required");
-
-      const raw = parseJsonBody(
-        await callKsuEndpoint({ endpoint: "calendarMonth", token, yearMonth }),
-      );
-      if (raw.code !== 0) {
-        throw new Error(String(raw.message || "failed to get calendar"));
-      }
-      return (raw.data as unknown[]) || [];
-    },
-
-    async get_current_time() {
-      return getCurrentTimePayload();
-    },
-  };
+  return tools;
 }
 
 export { buildKsuMcpTools };
-export type { CallKsuEndpoint, KsuEndpointInput, KsuMcpTools };
+export type { CallKsuEndpoint, KsuMcpTools, KsuToolDefinition };

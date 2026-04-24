@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { buildKsuMcpTools, type CallKsuEndpoint } from "./ksu-mcp.js";
+import {
+  createKsuMcpRegistry,
+  createKsuToolDefinitions,
+  type CallKsuEndpoint,
+} from "./mcp/ksu-mcp.js";
 import { createLogger } from "../shared/logger.js";
 import {
   ASSISTANT_STREAM_CHUNK_CHANNEL,
@@ -29,6 +33,40 @@ type StreamResult = {
 };
 
 const logger = createLogger("assistant:runtime");
+
+function createAssistantToolCacheAdapter(store: AssistantStore) {
+  return {
+    get(cacheKey: string, nowTs: number) {
+      const row = store.getToolCache(cacheKey, nowTs);
+      if (!row) return null;
+      return { value: row.value, updatedAt: row.updated_at };
+    },
+    set({
+      cacheKey,
+      scope,
+      value,
+      expiresAt,
+      updatedAt,
+    }: {
+      cacheKey: string;
+      scope: "memory" | "storage";
+      value: string;
+      expiresAt: number;
+      updatedAt: number;
+    }) {
+      store.setToolCache({
+        cacheKey,
+        scope,
+        value,
+        expiresAt,
+        updatedAt,
+      });
+    },
+    delete(cacheKey: string) {
+      store.deleteToolCache(cacheKey);
+    },
+  };
+}
 
 function emitChunk(event: IpcMainInvokeEvent, streamId: string, delta: string): void {
   logger.debug("stream chunk", { streamId, chunkLength: delta.length });
@@ -123,10 +161,13 @@ async function runAssistantStream({
       const { apiKey, model, baseURL } = resolveOpenAIConfig(payload, settings);
       const { streamText, tool } = await import("ai");
       const { createOpenAI } = await import("@ai-sdk/openai");
-      const { z } = await import("zod");
 
       const openai = createOpenAI({ apiKey, baseURL });
-      const ksu = buildKsuMcpTools({ callKsuEndpoint, token });
+      const registry = createKsuMcpRegistry({
+        callKsuEndpoint,
+        cache: createAssistantToolCacheAdapter(store),
+      });
+      const toolDefinitions = createKsuToolDefinitions({ callKsuEndpoint });
       const modelMessages = store
         .getMessages(conversationId)
         .filter(
@@ -138,41 +179,23 @@ async function runAssistantStream({
       const systemPrompt = settings.systemPrompt
         ? `${buildSystemPrompt()}\n\n${settings.systemPrompt}`
         : buildSystemPrompt();
+      const tools = Object.fromEntries(
+        toolDefinitions.map((definition) => [
+          definition.name,
+          tool({
+            description: definition.description,
+            inputSchema: definition.input,
+            execute: async (args: Record<string, unknown>) =>
+              registry.callTool(definition.name, args, { token }),
+          }),
+        ]),
+      );
 
       const result = streamText({
         model: openai.chat(model),
         system: systemPrompt,
         messages: [...modelMessages, { role: "user", content: message }],
-        tools: {
-          get_user_info: tool({
-            description: "获取当前用户基础信息",
-            inputSchema: z.object({}),
-            execute: async () => ksu.get_user_info(),
-          }),
-          get_personal_info: tool({
-            description: "获取个人概览信息（校园卡、课程数等）",
-            inputSchema: z.object({}),
-            execute: async () => ksu.get_personal_info(),
-          }),
-          get_grades: tool({
-            description: "获取成绩数据",
-            inputSchema: z.object({}),
-            execute: async () => ksu.get_grades(),
-          }),
-          get_calendar: tool({
-            description: "获取某个月校历，格式如 2026年02月",
-            inputSchema: z.object({
-              yearMonth: z.string(),
-            }),
-            execute: async ({ yearMonth }: { yearMonth: string }) =>
-              ksu.get_calendar({ yearMonth }),
-          }),
-          get_current_time: tool({
-            description: "获取当前本机时间",
-            inputSchema: z.object({}),
-            execute: async () => ksu.get_current_time(),
-          }),
-        },
+        tools,
       });
       let aggregated = "";
 

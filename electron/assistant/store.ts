@@ -43,6 +43,14 @@ type ReplaceMessageItem = {
   content: string;
 };
 
+type ToolCacheRecord = {
+  cache_key: string;
+  scope: string;
+  value: string;
+  expires_at: number;
+  updated_at: number;
+};
+
 type AssistantStore = {
   getSettings: () => AssistantSettings;
   setSettings: (patch: SettingsPatch) => AssistantSettings;
@@ -53,6 +61,15 @@ type AssistantStore = {
   addMessage: (conversationId: string, role: AssistantRole, content: string) => string;
   updateMessage: (id: string, content: string) => void;
   replaceMessages: (conversationId: string, messages: ReplaceMessageItem[]) => void;
+  getToolCache: (cacheKey: string, nowTs?: number) => ToolCacheRecord | null;
+  setToolCache: (input: {
+    cacheKey: string;
+    scope: "memory" | "storage";
+    value: string;
+    expiresAt: number;
+    updatedAt?: number;
+  }) => void;
+  deleteToolCache: (cacheKey: string) => void;
 };
 
 const DEFAULT_SETTINGS: AssistantSettings = {
@@ -97,6 +114,14 @@ function createAssistantStore(userDataDir: string): AssistantStore {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS tool_cache (
+      cache_key TEXT PRIMARY KEY,
+      scope TEXT NOT NULL,
+      value TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   const createConversationStmt = db.prepare(
@@ -133,6 +158,22 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     ON CONFLICT(key) DO UPDATE SET value=excluded.value
   `);
   const getSettingStmt = db.prepare("SELECT value FROM settings WHERE key = ?");
+  const getToolCacheStmt = db.prepare(`
+    SELECT cache_key, scope, value, expires_at, updated_at
+    FROM tool_cache
+    WHERE cache_key = ?
+  `);
+  const setToolCacheStmt = db.prepare(`
+    INSERT INTO tool_cache (cache_key, scope, value, expires_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(cache_key) DO UPDATE SET
+      scope=excluded.scope,
+      value=excluded.value,
+      expires_at=excluded.expires_at,
+      updated_at=excluded.updated_at
+  `);
+  const deleteToolCacheStmt = db.prepare("DELETE FROM tool_cache WHERE cache_key = ?");
+  const purgeExpiredToolCacheStmt = db.prepare("DELETE FROM tool_cache WHERE expires_at <= ?");
 
   function getSettings(): AssistantSettings {
     const out: AssistantSettings = { ...DEFAULT_SETTINGS };
@@ -221,6 +262,37 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     }
   }
 
+  function getToolCache(cacheKey: string, nowTs = now()): ToolCacheRecord | null {
+    purgeExpiredToolCacheStmt.run(nowTs);
+    const row = getToolCacheStmt.get(cacheKey) as ToolCacheRecord | undefined;
+    if (!row) return null;
+    if (row.expires_at <= nowTs) {
+      deleteToolCacheStmt.run(cacheKey);
+      return null;
+    }
+    return row;
+  }
+
+  function setToolCache(input: {
+    cacheKey: string;
+    scope: "memory" | "storage";
+    value: string;
+    expiresAt: number;
+    updatedAt?: number;
+  }): void {
+    setToolCacheStmt.run(
+      input.cacheKey,
+      input.scope,
+      input.value,
+      input.expiresAt,
+      input.updatedAt ?? now(),
+    );
+  }
+
+  function deleteToolCache(cacheKey: string): void {
+    deleteToolCacheStmt.run(cacheKey);
+  }
+
   return {
     getSettings,
     setSettings,
@@ -231,6 +303,9 @@ function createAssistantStore(userDataDir: string): AssistantStore {
     addMessage,
     updateMessage,
     replaceMessages,
+    getToolCache,
+    setToolCache,
+    deleteToolCache,
   };
 }
 
@@ -243,4 +318,5 @@ export type {
   ConversationRecord,
   MessageRecord,
   ReplaceMessageItem,
+  ToolCacheRecord,
 };

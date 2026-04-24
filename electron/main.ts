@@ -41,6 +41,40 @@ const __dirname = path.dirname(__filename);
 const logger = createLogger("main");
 const VERBOSE_RENDERER_LOGS = String(process.env.LOG_VERBOSE_RENDERER || "") === "1";
 
+function createAssistantToolCacheAdapter(store: ReturnType<typeof createAssistantStore>) {
+  return {
+    get(cacheKey: string, nowTs: number) {
+      const row = store.getToolCache(cacheKey, nowTs);
+      if (!row) return null;
+      return { value: row.value, updatedAt: row.updated_at };
+    },
+    set({
+      cacheKey,
+      scope,
+      value,
+      expiresAt,
+      updatedAt,
+    }: {
+      cacheKey: string;
+      scope: "memory" | "storage";
+      value: string;
+      expiresAt: number;
+      updatedAt: number;
+    }) {
+      store.setToolCache({
+        cacheKey,
+        scope,
+        value,
+        expiresAt,
+        updatedAt,
+      });
+    },
+    delete(cacheKey: string) {
+      store.deleteToolCache(cacheKey);
+    },
+  };
+}
+
 function resolveIconPath(): string {
   const icoPath = path.join(__dirname, "..", "build", "icons", "icon.ico");
   const pngPath = path.join(__dirname, "..", "build", "icons", "icon.png");
@@ -295,6 +329,7 @@ app.whenReady().then(() => {
     }
   }
   const assistantStore = createAssistantStore(app.getPath("userData"));
+  const assistantToolCache = createAssistantToolCacheAdapter(assistantStore);
   ipcMain.handle(AUTH_LOGIN_CHANNEL, async (event, payload: unknown) => {
     try {
       logger.info("auth login request received");
@@ -399,6 +434,7 @@ app.whenReady().then(() => {
   ipcMain.handle(ASSISTANT_MCP_LIST_TOOLS_CHANNEL, async (event) => {
     const registry = createKsuMcpRegistry({
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
+      cache: assistantToolCache,
     });
     logger.debug("mcp list tools");
     return registry.listTools();
@@ -406,6 +442,7 @@ app.whenReady().then(() => {
   ipcMain.handle(ASSISTANT_MCP_CALL_TOOL_CHANNEL, async (event, payload: unknown) => {
     const registry = createKsuMcpRegistry({
       callKsuEndpoint: async (input) => dispatchRequest(ipcMain, event, buildKsuRequest(input)),
+      cache: assistantToolCache,
     });
     const safePayload = (payload || {}) as {
       name?: string;
