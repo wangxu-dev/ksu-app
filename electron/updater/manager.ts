@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import type { App } from "electron";
 import type { AppUpdater, ProgressInfo, UpdateInfo } from "electron-updater";
-import { UPDATE_SOURCES } from "./sources.js";
+import { UPDATE_SOURCES, type UpdateSource } from "./sources.js";
 
 const require = createRequire(import.meta.url);
 
@@ -44,6 +44,43 @@ const DEFAULT_STATUS: UpdateStatus = {
   updatedAt: 0,
 };
 
+const SOURCE_PROBE_TIMEOUT_MS = 3500;
+
+function resolveChannelFilename(platform: NodeJS.Platform): string {
+  if (platform === "darwin") return "latest-mac.yml";
+  if (platform === "linux") return "latest-linux.yml";
+  return "latest.yml";
+}
+
+function buildFeedUrl(source: UpdateSource): string {
+  return `${source.baseUrl}/releases/latest/download`;
+}
+
+async function probeUpdateSource(
+  source: UpdateSource,
+  channelFile: string,
+): Promise<{ source: UpdateSource; elapsedMs: number }> {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SOURCE_PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${buildFeedUrl(source)}/${channelFile}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        accept: "text/yaml,text/plain,*/*",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return { source, elapsedMs: Date.now() - startedAt };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): UpdateManager {
   let autoUpdater: AppUpdater | null = null;
   let updaterAvailable = true;
@@ -61,7 +98,7 @@ function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): Updat
   let status: UpdateStatus = { ...DEFAULT_STATUS };
   let checking = false;
   let initialized = false;
-  let usingFallback = false;
+  let activeSource = UPDATE_SOURCES[0];
 
   function emit(next: Partial<UpdateStatus>): void {
     status = {
@@ -72,16 +109,50 @@ function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): Updat
     publish(status);
   }
 
-  function setSource(useFallback: boolean): void {
+  function setSource(source: UpdateSource): void {
     if (!autoUpdater) return;
-    const source = useFallback ? UPDATE_SOURCES.fallback : UPDATE_SOURCES.primary;
-    const url = `${source.baseUrl}/releases/latest/download`;
+    const url = buildFeedUrl(source);
     autoUpdater.setFeedURL({
       provider: "generic",
       url,
     });
-    usingFallback = useFallback;
+    activeSource = source;
     logger.info("updater source selected", { source: source.name, url });
+  }
+
+  async function selectBestSource(): Promise<UpdateSource> {
+    const channelFile = resolveChannelFilename(process.platform);
+    const results = await Promise.allSettled(
+      UPDATE_SOURCES.map((source) => probeUpdateSource(source, channelFile)),
+    );
+    const available = results
+      .filter(
+        (
+          item,
+        ): item is PromiseFulfilledResult<{
+          source: UpdateSource;
+          elapsedMs: number;
+        }> => item.status === "fulfilled",
+      )
+      .map((item) => item.value)
+      .sort((left, right) => left.elapsedMs - right.elapsedMs);
+
+    if (available.length > 0) {
+      logger.info("updater source probe results", {
+        channelFile,
+        results: available.map((item) => ({
+          source: item.source.name,
+          elapsedMs: item.elapsedMs,
+        })),
+      });
+      return available[0].source;
+    }
+
+    logger.warn("all updater source probes failed", {
+      channelFile,
+      sources: UPDATE_SOURCES.map((item) => item.name),
+    });
+    return UPDATE_SOURCES[0];
   }
 
   function ensureInitialized(): void {
@@ -98,7 +169,7 @@ function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): Updat
         state: "checking",
         message: "正在检查更新...",
         progress: 0,
-        source: usingFallback ? UPDATE_SOURCES.fallback.name : UPDATE_SOURCES.primary.name,
+        source: activeSource.name,
       });
     });
 
@@ -176,24 +247,22 @@ function createUpdateManager({ app, logger, publish }: UpdateManagerDeps): Updat
     }
 
     try {
-      setSource(false);
-      await autoUpdater.checkForUpdates();
-    } catch (primaryError) {
-      logger.warn("primary update source failed, trying fallback", {
-        message: primaryError instanceof Error ? primaryError.message : String(primaryError),
+      const bestSource = await selectBestSource();
+      setSource(bestSource);
+      logger.info("updater source locked for current check", {
+        source: bestSource.name,
       });
-      try {
-        setSource(true);
-        await autoUpdater.checkForUpdates();
-      } catch (fallbackError) {
-        const fallbackMessage =
-          fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-        logger.error("fallback update source failed", { message: fallbackMessage });
-        emit({
-          state: "error",
-          message: fallbackMessage,
-        });
-      }
+      await autoUpdater.checkForUpdates();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("update check failed", {
+        message,
+        source: activeSource.name,
+      });
+      emit({
+        state: "error",
+        message,
+      });
     } finally {
       checking = false;
     }
