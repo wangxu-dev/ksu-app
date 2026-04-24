@@ -1,6 +1,8 @@
 import {
   Bot,
   Brain,
+  Check,
+  Copy,
   Wrench,
   Loader2,
   RotateCcw,
@@ -139,6 +141,7 @@ function AssistantMessageList({
 }: AssistantMessageListProps) {
   const { messages: text } = useI18n();
   const [elapsedText, setElapsedText] = useState("0s");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const isProcessing = status === "submitted" || status === "thinking" || status === "streaming";
 
   useEffect(() => {
@@ -153,6 +156,14 @@ function AssistantMessageList({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isProcessing]);
+
+  useEffect(() => {
+    if (!copiedMessageId) return;
+    const timer = window.setTimeout(() => {
+      setCopiedMessageId(null);
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [copiedMessageId]);
 
   const inlineStatusText = buildInlineStatusText(status, toolActivities, lastError, {
     requestSubmitted: text.assistant.requestSubmitted,
@@ -188,6 +199,7 @@ function AssistantMessageList({
         const hasText = message.content.trim().length > 0;
         const showRegenerate =
           !isUser && !isBusy && canRegenerate && message.id === lastAssistantMessageId && hasText;
+        const showCopy = hasText;
         const timelineEvents = !isUser ? (preResponseEventsMap[message.id] ?? []) : [];
         const showTimeline = !isUser && timelineEvents.length > 0;
 
@@ -249,18 +261,54 @@ function AssistantMessageList({
                   </div>
                 </div>
               )}
-              {showRegenerate ? (
+              {showCopy || showRegenerate ? (
                 <div className="pt-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
-                    onClick={() => void onRegenerate?.()}
-                    title={text.assistant.regenerate}
-                    aria-label={text.assistant.regenerate}
+                  <div
+                    className={cn(
+                      "flex items-center gap-1",
+                      isUser ? "justify-end" : "justify-start",
+                    )}
                   >
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
+                    {showCopy ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(message.content);
+                          setCopiedMessageId(message.id);
+                        }}
+                        title={
+                          copiedMessageId === message.id
+                            ? text.assistant.copied
+                            : text.assistant.copy
+                        }
+                        aria-label={
+                          copiedMessageId === message.id
+                            ? text.assistant.copied
+                            : text.assistant.copy
+                        }
+                      >
+                        {copiedMessageId === message.id ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                    ) : null}
+                    {showRegenerate ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
+                        onClick={() => void onRegenerate?.()}
+                        title={text.assistant.regenerate}
+                        aria-label={text.assistant.regenerate}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
