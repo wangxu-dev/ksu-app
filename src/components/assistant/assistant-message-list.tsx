@@ -9,9 +9,9 @@ import {
   TriangleAlert,
   User as UserIcon,
 } from "lucide-react";
+import MarkdownPreview from "@uiw/react-markdown-preview";
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -140,6 +140,7 @@ function AssistantMessageList({
   toolActivities = [],
 }: AssistantMessageListProps) {
   const { messages: text } = useI18n();
+  const { resolvedTheme } = useTheme();
   const [elapsedText, setElapsedText] = useState("0s");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const isProcessing = status === "submitted" || status === "thinking" || status === "streaming";
@@ -233,23 +234,14 @@ function AssistantMessageList({
               ) : hasText ? (
                 <div className="space-y-2">
                   {showTimeline ? <AssistantPreResponseTimeline events={timelineEvents} /> : null}
-                  <div className="px-1 py-1 text-sm font-medium leading-relaxed text-foreground">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                        ul: ({ children }) => (
-                          <ul className="mb-3 list-disc space-y-1 pl-5">{children}</ul>
-                        ),
-                        code: ({ children }) => (
-                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium">
-                            {children}
-                          </code>
-                        ),
+                  <div className="assistant-markdown px-1 py-1">
+                    <MarkdownPreview
+                      source={message.content}
+                      wrapperElement={{
+                        "data-color-mode": resolvedTheme === "dark" ? "dark" : "light",
                       }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
+                      className="!bg-transparent !p-0 !text-sm !leading-relaxed !text-foreground"
+                    />
                   </div>
                 </div>
               ) : (

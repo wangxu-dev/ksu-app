@@ -124,3 +124,29 @@
     @apply font-bold tracking-tight;
   }
 }
+
+@layer components {
+  .assistant-markdown .wmde-markdown {
+    background-color: transparent !important;
+    color: var(--foreground) !important;
+    font-size: 0.875rem !important;
+    line-height: 1.75 !important;
+    font-weight: 500 !important;
+  }
+
+  .assistant-markdown .wmde-markdown > :first-child {
+    margin-top: 0 !important;
+  }
+
+  .assistant-markdown .wmde-markdown > :last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .assistant-markdown .wmde-markdown table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+}
