@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.3 - 2026-04-24
+
+### Added
+
+- Added assistant provider settings with DeepSeek as the default option and OpenRouter as an alternate option.
+- Added assistant pre-response timeline persistence for reasoning text and tool execution events.
+- Added lightweight assistant message actions, including regenerate and raw Markdown copy.
+- Added richer Markdown rendering with improved table support in assistant messages.
+- Added global locale management and aligned core UI copy for Chinese and English surfaces.
+
+### Changed
+
+- Refactored assistant runtime into a provider-split flow so OpenRouter and DeepSeek follow their own official integration paths.
+- Reworked assistant conversation UI into dedicated header, composer, history, message list, and settings modules.
+- Simplified assistant settings UX to show only the active provider configuration and close the dialog after saving.
+- Refined assistant process display to show reasoning and tool activity in a compact, time-ordered timeline.
+
+### Fixed
+
+- Fixed duplicated or repeated assistant output during multi-turn streaming.
+- Fixed DeepSeek tool-calling follow-up behavior by switching to SDK-based streaming and preserving reasoning context across turns.
+- Fixed unstable assistant rendering and status handling around empty responses, regeneration, and ongoing stream updates.
+
 ## 0.0.2 - 2026-03-04
 
 ### Added

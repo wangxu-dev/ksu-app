@@ -1,6 +1,6 @@
 {
   "name": "ksu-app",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Ksu-App desktop client with campus data and built-in assistant.",
   "author": "wangxu-dev",
