@@ -104,9 +104,14 @@ function createAssistantToolCacheAdapter(store: AssistantStore) {
   };
 }
 
-function emitChunk(event: IpcMainInvokeEvent, streamId: string, delta: string): void {
+function emitChunk(
+  event: IpcMainInvokeEvent,
+  streamId: string,
+  delta: string,
+  text?: string,
+): void {
   logger.debug("stream chunk", { streamId, chunkLength: delta.length });
-  event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta });
+  event.sender.send(ASSISTANT_STREAM_CHUNK_CHANNEL, { streamId, delta, text });
 }
 
 function emitStatus(
@@ -148,6 +153,82 @@ function normalizeTextDelta(delta: unknown): string {
     return new TextDecoder().decode(Uint8Array.from(delta));
   }
   return String(delta || "");
+}
+
+function mergeTextDelta(
+  currentText: string,
+  nextDelta: string,
+): { text: string; appended: string; deduped: boolean } {
+  if (!nextDelta) {
+    return { text: currentText, appended: "", deduped: false };
+  }
+
+  if (!currentText) {
+    return { text: nextDelta, appended: nextDelta, deduped: false };
+  }
+
+  if (currentText.endsWith(nextDelta)) {
+    return { text: currentText, appended: "", deduped: true };
+  }
+
+  const maxOverlap = Math.min(currentText.length, nextDelta.length);
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    if (currentText.slice(-size) === nextDelta.slice(0, size)) {
+      const appended = nextDelta.slice(size);
+      if (!appended) {
+        return { text: currentText, appended: "", deduped: true };
+      }
+      return {
+        text: currentText + appended,
+        appended,
+        deduped: size > 0,
+      };
+    }
+  }
+
+  return {
+    text: currentText + nextDelta,
+    appended: nextDelta,
+    deduped: false,
+  };
+}
+
+function collapseAdjacentRepeats(text: string): string {
+  let result = text;
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    for (let size = Math.min(24, Math.floor(result.length / 2)); size >= 1; size -= 1) {
+      let index = 0;
+      let next = "";
+
+      while (index < result.length) {
+        const chunk = result.slice(index, index + size);
+        if (
+          chunk &&
+          chunk.length === size &&
+          result.slice(index + size, index + size * 2) === chunk
+        ) {
+          next += chunk;
+          index += size * 2;
+          while (result.slice(index, index + size) === chunk) {
+            index += size;
+          }
+          changed = true;
+          continue;
+        }
+
+        next += result[index] || "";
+        index += 1;
+      }
+
+      result = next;
+    }
+  }
+
+  return result;
 }
 
 function summarizeToolOutput(output: unknown): string | undefined {
@@ -357,7 +438,8 @@ async function runAssistantStream({
           },
         },
       );
-      let aggregated = "";
+      let aggregatedRaw = "";
+      let aggregatedDisplay = "";
       let lastTextDelta = "";
 
       emitStatus(event, streamId, "thinking");
@@ -370,10 +452,24 @@ async function runAssistantStream({
             continue;
           }
           lastTextDelta = textDelta;
-          aggregated += textDelta;
-          store.updateMessage(assistantMessageId, aggregated);
+          const merged = mergeTextDelta(aggregatedRaw, textDelta);
+          if (!merged.appended) {
+            logger.warn("overlap text delta skipped", { streamId, textDelta });
+            continue;
+          }
+          aggregatedRaw = merged.text;
+          const normalizedText = collapseAdjacentRepeats(aggregatedRaw);
+          if (normalizedText === aggregatedDisplay) {
+            logger.warn("normalized text delta skipped", { streamId, textDelta });
+            continue;
+          }
+          const uiDelta = normalizedText.startsWith(aggregatedDisplay)
+            ? normalizedText.slice(aggregatedDisplay.length)
+            : normalizedText;
+          aggregatedDisplay = normalizedText;
+          store.updateMessage(assistantMessageId, aggregatedDisplay);
           emitStatus(event, streamId, "streaming");
-          emitChunk(event, streamId, textDelta);
+          emitChunk(event, streamId, uiDelta, aggregatedDisplay);
         }
 
         if (streamEvent.type === "raw_model_stream_event") {
@@ -412,10 +508,14 @@ async function runAssistantStream({
         throw stream.error;
       }
 
-      if (!aggregated && typeof stream.finalOutput === "string" && stream.finalOutput.trim()) {
-        aggregated = stream.finalOutput.trim();
-        store.updateMessage(assistantMessageId, aggregated);
-        emitChunk(event, streamId, aggregated);
+      if (
+        !aggregatedDisplay &&
+        typeof stream.finalOutput === "string" &&
+        stream.finalOutput.trim()
+      ) {
+        aggregatedDisplay = collapseAdjacentRepeats(stream.finalOutput.trim());
+        store.updateMessage(assistantMessageId, aggregatedDisplay);
+        emitChunk(event, streamId, aggregatedDisplay, aggregatedDisplay);
       }
       emitStatus(event, streamId, "completed");
       emitDone(event, streamId);

@@ -106,13 +106,13 @@ function useAssistantController() {
   }, []);
 
   useEffect(() => {
-    const offChunk = onAssistantChunk(({ streamId, delta }) => {
+    const offChunk = onAssistantChunk(({ streamId, delta, text }) => {
       const activeStream = activeStreamRef.current;
       if (!activeStream || activeStream.streamId !== streamId) return;
       setMessages((prev) =>
         prev.map((item) =>
           item.id === activeStream.assistantMessageId
-            ? { ...item, content: item.content + delta }
+            ? { ...item, content: typeof text === "string" ? text : item.content + delta }
             : item,
         ),
       );

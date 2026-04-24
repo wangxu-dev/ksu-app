@@ -170,10 +170,10 @@ export function callMcpTool<T = unknown>(
 }
 
 export function onAssistantChunk(
-  listener: (payload: { streamId: string; delta: string }) => void,
+  listener: (payload: { streamId: string; delta: string; text?: string }) => void,
 ): () => void {
   return ipcOn(ASSISTANT_STREAM_CHUNK_CHANNEL, (payload) =>
-    listener(payload as { streamId: string; delta: string }),
+    listener(payload as { streamId: string; delta: string; text?: string }),
   );
 }
 
